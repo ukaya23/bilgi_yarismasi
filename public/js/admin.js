@@ -135,6 +135,14 @@ function setupSocketEvents() {
             showToast(data.error || 'Bir hata oluştu', 'error');
         }
     });
+
+    // Oyun Resetlendiğinde
+    socketManager.on('GAME_RESET', () => {
+        console.log('[ADMIN] Game reset received');
+        contestants = [];
+        updateContestantsUI();
+        updateLeaderboard([]); // Açıkça boş dizi ile güncelle
+    });
 }
 
 // ==================== UI UPDATES ====================

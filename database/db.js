@@ -244,10 +244,13 @@ function getLeaderboard() {
 }
 
 /**
- * Tüm yarışmacıları sıfırla
+ * Tüm yarışmacıları sil (reset için)
  */
 function resetAllContestants() {
-    return run(`UPDATE contestants SET total_score = 0, status = 'OFFLINE', socket_id = NULL`);
+    // Önce cevapları sil
+    run('DELETE FROM answers');
+    // Sonra yarışmacıları sil
+    return run('DELETE FROM contestants');
 }
 
 // ==================== CEVAP İŞLEMLERİ ====================

@@ -186,7 +186,28 @@ class GameState {
 
         if (!this.currentQuestion || !this.io) return;
 
-        const answers = db.getAnswersForQuestion(this.currentQuestion.id);
+        // Cevapları ve tüm yarışmacıları al
+        let answers = db.getAnswersForQuestion(this.currentQuestion.id);
+        const allContestants = db.getAllContestants();
+
+        // Cevap vermeyenleri bul ve boş cevap olarak ekle
+        const answeredContestantIds = new Set(answers.map(a => a.contestant_id));
+
+        // Cevap vermeyenler için boş cevap kaydı oluştur
+        for (const contestant of allContestants) {
+            if (!answeredContestantIds.has(contestant.id) && contestant.status !== 'OFFLINE') {
+                db.saveAnswer(
+                    this.currentQuestion.id,
+                    contestant.id,
+                    '', // Boş cevap metni
+                    0   // Süre bitti
+                );
+            }
+        }
+
+        // 4. Cevapları tekrar çek (yeni eklenenler dahil)
+        answers = db.getAnswersForQuestion(this.currentQuestion.id);
+
         const groupedAnswers = this.groupAnswers(answers);
 
         this.io.to('jury').emit('JURY_REVIEW_DATA', {
@@ -369,7 +390,14 @@ class GameState {
 
         if (this.io) {
             this.io.emit('GAME_RESET');
+            // Sıfırlama sonrası güncel yarışmacı listesi ve liderlik tablosunu gönder
+            const updatedContestants = db.getAllContestants();
+            const updatedLeaderboard = db.getLeaderboard();
+            this.io.emit('CONTESTANTS_UPDATED', updatedContestants);
+            this.io.emit('LEADERBOARD_UPDATED', updatedLeaderboard);
         }
+
+        console.log('[STATE] Oyun sıfırlandı');
     }
 }
 
