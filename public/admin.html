@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Paneli - Bilgi Yarışması</title>
+    <link rel="stylesheet" href="/css/common.css">
+    <link rel="stylesheet" href="/css/admin.css">
+</head>
+
+<body class="gradient-bg">
+    <div class="admin-layout">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <span class="logo-icon">🎯</span>
+                <span class="logo-text">Bilgi Yarışması</span>
+            </div>
+
+            <nav class="sidebar-nav">
+                <a href="#" class="nav-item active" data-section="dashboard">
+                    <span>📊</span> Dashboard
+                </a>
+                <a href="#" class="nav-item" data-section="questions">
+                    <span>❓</span> Sorular
+                </a>
+                <a href="#" class="nav-item" data-section="contestants">
+                    <span>👥</span> Yarışmacılar
+                </a>
+                <a href="#" class="nav-item" data-section="settings">
+                    <span>⚙️</span> Ayarlar
+                </a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="connection-status">
+                    <span class="status-dot" id="connectionDot"></span>
+                    <span id="connectionText">Bağlanıyor...</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Dashboard Section -->
+            <section id="dashboard-section" class="section active">
+                <header class="section-header">
+                    <h1>Yarışma Kontrol Paneli</h1>
+                    <div class="header-actions">
+                        <button class="btn btn-danger" id="resetGameBtn">
+                            🔄 Yarışmayı Sıfırla
+                        </button>
+                    </div>
+                </header>
+
+                <!-- Game Status -->
+                <div class="game-status-bar">
+                    <div class="status-item">
+                        <span class="status-label">Durum</span>
+                        <span class="status-value" id="gameState">IDLE</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">Aktif Soru</span>
+                        <span class="status-value" id="currentQuestion">-</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">Kalan Süre</span>
+                        <span class="status-value timer" id="timerDisplay">--</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">Cevap Veren</span>
+                        <span class="status-value" id="answeredCount">0/0</span>
+                    </div>
+                </div>
+
+                <!-- Quick Actions -->
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h3 class="card-title">⚡ Hızlı Kontroller</h3>
+                    </div>
+                    <div class="quick-actions">
+                        <div class="form-group">
+                            <label class="form-label">Sıradaki Soru</label>
+                            <select class="form-control" id="questionSelect">
+                                <option value="">Soru Seçin...</option>
+                            </select>
+                        </div>
+                        <div class="action-buttons">
+                            <button class="btn btn-success btn-lg" id="startQuestionBtn" disabled>
+                                ▶️ Soruyu Başlat
+                            </button>
+                            <button class="btn btn-secondary btn-lg" id="skipToGradingBtn" disabled>
+                                ⏭️ Süreyi Bitir
+                            </button>
+                            <button class="btn btn-primary btn-lg" id="showResultsBtn" disabled>
+                                📊 Sonuçları Göster
+                            </button>
+                            <button class="btn btn-secondary btn-lg" id="goIdleBtn" disabled>
+                                ⏸️ Beklemeye Al
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Contestants Grid -->
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h3 class="card-title">👥 Yarışmacılar</h3>
+                        <span class="badge badge-primary" id="onlineCount">0 Online</span>
+                    </div>
+                    <div class="contestants-grid" id="contestantsGrid">
+                        <div class="empty-state">
+                            <p>Henüz yarışmacı bağlanmadı</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Leaderboard -->
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h3 class="card-title">🏆 Liderlik Tablosu</h3>
+                    </div>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Sıra</th>
+                                    <th>Masa</th>
+                                    <th>İsim</th>
+                                    <th>Puan</th>
+                                </tr>
+                            </thead>
+                            <tbody id="leaderboardBody">
+                                <tr>
+                                    <td colspan="4" class="text-center text-muted">Veri yok</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Questions Section -->
+            <section id="questions-section" class="section">
+                <header class="section-header">
+                    <h1>Soru Yönetimi</h1>
+                    <button class="btn btn-primary" id="addQuestionBtn">
+                        ➕ Yeni Soru
+                    </button>
+                </header>
+
+                <div class="card">
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Kategori</th>
+                                    <th>Soru</th>
+                                    <th>Tip</th>
+                                    <th>Puan</th>
+                                    <th>Süre</th>
+                                    <th>İşlemler</th>
+                                </tr>
+                            </thead>
+                            <tbody id="questionsTableBody">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Contestants Section -->
+            <section id="contestants-section" class="section">
+                <header class="section-header">
+                    <h1>Yarışmacı Yönetimi</h1>
+                </header>
+
+                <div class="card">
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Masa</th>
+                                    <th>İsim</th>
+                                    <th>Puan</th>
+                                    <th>Durum</th>
+                                </tr>
+                            </thead>
+                            <tbody id="contestantsTableBody">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Settings Section -->
+            <section id="settings-section" class="section">
+                <header class="section-header">
+                    <h1>Ayarlar</h1>
+                </header>
+
+                <div class="card">
+                    <h3>🔧 Sistem Bilgileri</h3>
+                    <p><strong>Sunucu:</strong> <span id="serverInfo">192.168.1.100:3000</span></p>
+                    <p><strong>Versiyon:</strong> 1.0.0</p>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Question Modal -->
+    <div class="modal" id="questionModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalTitle">Yeni Soru Ekle</h3>
+                <button class="btn btn-icon" id="closeModalBtn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="questionForm">
+                    <input type="hidden" id="questionId">
+
+                    <div class="form-group">
+                        <label class="form-label">Soru Metni</label>
+                        <textarea class="form-control" id="questionContent" rows="3" required></textarea>
+                    </div>
+
+                    <div class="grid grid-2">
+                        <div class="form-group">
+                            <label class="form-label">Kategori</label>
+                            <input type="text" class="form-control" id="questionCategory" placeholder="Örn: Tarih">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Soru Tipi</label>
+                            <select class="form-control" id="questionType" required>
+                                <option value="MULTIPLE_CHOICE">Çoktan Seçmeli</option>
+                                <option value="OPEN_ENDED">Açık Uçlu</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div id="optionsContainer">
+                        <div class="form-group">
+                            <label class="form-label">Şıklar (Her satıra bir şık)</label>
+                            <textarea class="form-control" id="questionOptions" rows="4"
+                                placeholder="A şıkkı&#10;B şıkkı&#10;C şıkkı&#10;D şıkkı"></textarea>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Doğru Cevap(lar) (Her satıra bir)</label>
+                        <textarea class="form-control" id="questionCorrectKeys" rows="2" required
+                            placeholder="Doğru cevap"></textarea>
+                    </div>
+
+                    <div class="grid grid-2">
+                        <div class="form-group">
+                            <label class="form-label">Puan</label>
+                            <input type="number" class="form-control" id="questionPoints" value="10" min="1" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Süre (saniye)</label>
+                            <input type="number" class="form-control" id="questionDuration" value="30" min="5" required>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="cancelModalBtn">İptal</button>
+                <button class="btn btn-success" id="saveQuestionBtn">Kaydet</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/socket.io.min.js"></script>
+    <script src="/js/common.js"></script>
+    <script src="/js/admin.js"></script>
+</body>
+
+</html>

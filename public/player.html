@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Yarışmacı - Bilgi Yarışması</title>
+    <link rel="stylesheet" href="/css/common.css">
+    <link rel="stylesheet" href="/css/player.css">
+</head>
+
+<body class="gradient-bg">
+    <!-- Login Screen -->
+    <div class="screen" id="loginScreen">
+        <div class="login-container">
+            <div class="login-header">
+                <div class="logo-icon">🎮</div>
+                <h1>Bilgi Yarışması</h1>
+                <p>Yarışmaya katılmak için bilgilerinizi girin</p>
+            </div>
+
+            <form id="loginForm">
+                <div class="form-group">
+                    <label class="form-label">Adınız Soyadınız</label>
+                    <input type="text" class="form-control form-control-lg" id="playerName"
+                        placeholder="Örn: Ahmet Yılmaz" required autocomplete="off">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Masa Numarası</label>
+                    <input type="number" class="form-control form-control-lg" id="tableNo" placeholder="Örn: 1" required
+                        min="1" max="50" autocomplete="off">
+                </div>
+
+                <button type="submit" class="btn btn-success btn-lg btn-block">
+                    🚀 Yarışmaya Katıl
+                </button>
+            </form>
+
+            <div class="login-footer">
+                <div class="connection-indicator">
+                    <span class="status-dot" id="connectionDot"></span>
+                    <span id="connectionText">Bağlanıyor...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Waiting Screen -->
+    <div class="screen hidden" id="waitingScreen">
+        <div class="waiting-container">
+            <div class="player-info">
+                <span class="table-badge" id="playerTableBadge">Masa 1</span>
+                <span class="player-name" id="playerNameDisplay">Ahmet</span>
+            </div>
+
+            <div class="waiting-content">
+                <div class="waiting-icon">⏳</div>
+                <h2>Soru Bekleniyor...</h2>
+                <p>Sunucu soruyu başlattığında ekranınız otomatik güncellenecek</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Question Screen -->
+    <div class="screen hidden" id="questionScreen">
+        <div class="question-container">
+            <!-- Timer -->
+            <div class="timer-section">
+                <div class="timer" id="questionTimer">30</div>
+                <div class="timer-label">saniye</div>
+            </div>
+
+            <!-- Question -->
+            <div class="question-content">
+                <div class="question-meta">
+                    <span class="question-points" id="questionPoints">10 Puan</span>
+                </div>
+                <div class="question-text" id="questionText">
+                    Soru metni burada görünecek...
+                </div>
+
+                <!-- Media (optional) -->
+                <div class="question-media hidden" id="questionMedia">
+                    <img src="" alt="Soru görseli" id="questionImage">
+                </div>
+            </div>
+
+            <!-- Answer Input (Open-ended) -->
+            <div class="answer-section hidden" id="openEndedSection">
+                <input type="text" class="answer-input" id="answerInput" placeholder="Cevabınızı yazın..."
+                    autocomplete="off">
+                <button class="btn btn-success btn-lg btn-block" id="submitAnswerBtn">
+                    ✓ Cevabı Gönder
+                </button>
+            </div>
+
+            <!-- Answer Options (Multiple Choice) -->
+            <div class="options-section hidden" id="multipleChoiceSection">
+                <div class="options-grid" id="optionsGrid">
+                    <!-- Options will be rendered here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Answer Submitted Screen -->
+    <div class="screen hidden" id="submittedScreen">
+        <div class="submitted-container">
+            <div class="submitted-icon">✅</div>
+            <h2>Cevabınız Alındı!</h2>
+            <p class="submitted-answer" id="submittedAnswer">Cevabınız: <span></span></p>
+            <p class="submitted-info">Diğer yarışmacılar bekleniyor...</p>
+        </div>
+    </div>
+
+    <!-- Results Screen -->
+    <div class="screen hidden" id="resultsScreen">
+        <div class="results-container">
+            <div class="result-header">
+                <div class="result-icon" id="resultIcon">🎉</div>
+                <h2 id="resultTitle">Sonuçlar</h2>
+            </div>
+
+            <div class="correct-answer-box">
+                <span class="label">Doğru Cevap</span>
+                <span class="answer" id="correctAnswer">-</span>
+            </div>
+
+            <div class="your-result">
+                <span class="label">Sizin Cevabınız</span>
+                <span class="answer" id="yourAnswer">-</span>
+                <span class="result-badge" id="resultBadge">Bekleniyor</span>
+            </div>
+
+            <div class="score-update">
+                <span id="scoreChange">+0</span>
+                <span>puan</span>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/socket.io.min.js"></script>
+    <script src="/js/common.js"></script>
+    <script src="/js/player.js"></script>
+</body>
+
+</html>

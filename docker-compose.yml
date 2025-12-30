@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  quiz-server:
+    build: .
+    container_name: bilgi-yarismasi
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./database:/app/database
+    restart: always
+    environment:
+      - NODE_ENV=production
+    networks:
+      - quiz-network
+
+networks:
+  quiz-network:
+    driver: bridge

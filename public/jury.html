@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jüri Paneli - Bilgi Yarışması</title>
+    <link rel="stylesheet" href="/css/common.css">
+    <link rel="stylesheet" href="/css/jury.css">
+</head>
+
+<body class="gradient-bg">
+    <div class="jury-container">
+        <!-- Header -->
+        <header class="jury-header">
+            <div class="header-left">
+                <span class="logo-icon">⚖️</span>
+                <h1>Jüri Paneli</h1>
+            </div>
+            <div class="header-right">
+                <div class="connection-status">
+                    <span class="status-dot" id="connectionDot"></span>
+                    <span id="connectionText">Bağlanıyor...</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="jury-main">
+            <!-- Waiting State -->
+            <div class="state-panel" id="waitingPanel">
+                <div class="waiting-content">
+                    <div class="waiting-icon">⏳</div>
+                    <h2>Değerlendirme Bekleniyor</h2>
+                    <p>Açık uçlu bir soru tamamlandığında değerlendirme burada görünecek</p>
+                </div>
+            </div>
+
+            <!-- Grading State -->
+            <div class="state-panel hidden" id="gradingPanel">
+                <!-- Question Info -->
+                <div class="question-info card">
+                    <div class="question-header">
+                        <span class="question-badge" id="questionBadge">Soru #1</span>
+                        <span class="question-points" id="questionPoints">10 Puan</span>
+                    </div>
+                    <div class="question-text" id="questionText">
+                        Soru metni...
+                    </div>
+                    <div class="correct-answer">
+                        <span class="label">Kabul Edilen Cevaplar:</span>
+                        <span class="answers" id="correctAnswers">-</span>
+                    </div>
+                </div>
+
+                <!-- Answer Groups -->
+                <div class="groups-container">
+                    <!-- Correct Group -->
+                    <div class="answer-group correct-group" id="correctGroup">
+                        <div class="group-header">
+                            <div class="group-title">
+                                <span class="group-icon">✅</span>
+                                <span>Doğru Eşleşenler</span>
+                                <span class="group-count" id="correctCount">0</span>
+                            </div>
+                            <button class="btn btn-success" id="approveCorrectBtn">
+                                Tümüne Tam Puan Ver
+                            </button>
+                        </div>
+                        <div class="answers-list" id="correctAnswersList">
+                            <!-- Answers will be rendered here -->
+                        </div>
+                    </div>
+
+                    <!-- Incorrect Group -->
+                    <div class="answer-group incorrect-group" id="incorrectGroup">
+                        <div class="group-header">
+                            <div class="group-title">
+                                <span class="group-icon">❌</span>
+                                <span>Yanlış/Belirsiz</span>
+                                <span class="group-count" id="incorrectCount">0</span>
+                            </div>
+                            <button class="btn btn-danger" id="rejectAllBtn">
+                                Tümüne 0 Puan Ver
+                            </button>
+                        </div>
+                        <div class="answers-list" id="incorrectAnswersList">
+                            <!-- Answers will be rendered here -->
+                        </div>
+                    </div>
+
+                    <!-- Empty Group -->
+                    <div class="answer-group empty-group" id="emptyGroup">
+                        <div class="group-header">
+                            <div class="group-title">
+                                <span class="group-icon">⚪</span>
+                                <span>Cevap Vermeyenler</span>
+                                <span class="group-count" id="emptyCount">0</span>
+                            </div>
+                        </div>
+                        <div class="answers-list" id="emptyAnswersList">
+                            <!-- Empty answers will be rendered here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action Bar -->
+                <div class="action-bar">
+                    <div class="grading-stats">
+                        <span>Puanlanan: <strong id="gradedCount">0</strong></span>
+                        <span>Bekleyen: <strong id="pendingCount">0</strong></span>
+                    </div>
+                    <button class="btn btn-primary btn-lg" id="commitResultsBtn">
+                        📊 Puanları İşle ve Sonuçları Göster
+                    </button>
+                </div>
+            </div>
+
+            <!-- Results Shown State -->
+            <div class="state-panel hidden" id="resultsPanel">
+                <div class="results-content">
+                    <div class="results-icon">✅</div>
+                    <h2>Değerlendirme Tamamlandı</h2>
+                    <p>Sonuçlar seyirci ekranında gösteriliyor</p>
+                    <p class="text-muted">Sonraki soru için bekleniyor...</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/js/socket.io.min.js"></script>
+    <script src="/js/common.js"></script>
+    <script src="/js/jury.js"></script>
+</body>
+
+</html>

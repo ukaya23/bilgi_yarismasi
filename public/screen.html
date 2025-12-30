@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seyirci Ekranı - Bilgi Yarışması</title>
+    <link rel="stylesheet" href="/css/common.css">
+    <link rel="stylesheet" href="/css/screen.css">
+</head>
+
+<body class="screen-body">
+    <!-- Idle Screen (Logo & Waiting) -->
+    <div class="screen-state" id="idleScreen">
+        <div class="idle-content">
+            <div class="logo-large animate-pulse">🎯</div>
+            <h1 class="title-large">Bilgi Yarışması</h1>
+            <p class="subtitle">Yarışma başlamak üzere...</p>
+
+            <div class="contestants-preview" id="contestantsPreview">
+                <!-- Online contestants will appear here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Question Active Screen (Masked - No Question Text) -->
+    <div class="screen-state hidden" id="questionScreen">
+        <div class="question-layout">
+            <!-- Left: Timer & Category -->
+            <div class="left-panel">
+                <div class="timer-box">
+                    <div class="timer-value" id="timerValue">30</div>
+                    <div class="timer-label">SANİYE</div>
+                </div>
+
+                <div class="info-box">
+                    <div class="category-label">Kategori</div>
+                    <div class="category-value" id="categoryValue">Genel Kültür</div>
+                </div>
+
+                <div class="info-box points">
+                    <div class="points-value" id="pointsValue">10</div>
+                    <div class="points-label">PUAN</div>
+                </div>
+            </div>
+
+            <!-- Center: Quote -->
+            <div class="center-panel">
+                <div class="quote-container">
+                    <div class="quote-icon">💭</div>
+                    <blockquote class="quote-text" id="quoteText">
+                        "Bilgi güçtür."
+                    </blockquote>
+                    <cite class="quote-author" id="quoteAuthor">— Francis Bacon</cite>
+                </div>
+
+                <div class="thinking-indicator">
+                    <span>Yarışmacılar düşünüyor</span>
+                    <div class="dots">
+                        <span></span><span></span><span></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: Contestants Status -->
+            <div class="right-panel">
+                <h3 class="panel-title">Yarışmacılar</h3>
+                <div class="contestants-grid" id="contestantsGrid">
+                    <!-- Contestant status cards -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Grading Screen -->
+    <div class="screen-state hidden" id="gradingScreen">
+        <div class="grading-content">
+            <div class="grading-icon">⏳</div>
+            <h2>Jüri Değerlendirmesi Sürüyor...</h2>
+            <p>Açık uçlu cevaplar değerlendiriliyor</p>
+            <div class="loading-bar">
+                <div class="loading-progress"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Results Screen -->
+    <div class="screen-state hidden" id="resultsScreen">
+        <div class="results-layout">
+            <!-- Question & Answer Reveal -->
+            <div class="reveal-panel">
+                <div class="question-reveal animate-slide-down">
+                    <div class="reveal-label">SORU</div>
+                    <div class="reveal-question" id="revealQuestion">
+                        Soru metni burada görünecek...
+                    </div>
+                </div>
+
+                <div class="answer-reveal animate-slide-up">
+                    <div class="reveal-label">DOĞRU CEVAP</div>
+                    <div class="reveal-answer" id="revealAnswer">
+                        Cevap
+                    </div>
+                </div>
+            </div>
+
+            <!-- Leaderboard -->
+            <div class="leaderboard-panel">
+                <h3 class="panel-title">🏆 Sıralama</h3>
+                <div class="leaderboard" id="leaderboard">
+                    <!-- Leaderboard entries -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Connection Overlay -->
+    <div class="connection-indicator" id="connectionIndicator">
+        <span class="status-dot" id="connectionDot"></span>
+    </div>
+
+    <script src="/js/socket.io.min.js"></script>
+    <script src="/js/common.js"></script>
+    <script src="/js/screen.js"></script>
+</body>
+
+</html>

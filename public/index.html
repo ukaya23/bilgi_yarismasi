@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bilgi Yarışması - Giriş</title>
+    <link rel="stylesheet" href="/css/common.css">
+    <style>
+        .landing-container {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            background: radial-gradient(ellipse at center, #1a1a3e 0%, var(--bg-darker) 100%);
+        }
+
+        .logo {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            animation: bounce 2s ease-in-out infinite;
+        }
+
+        .title {
+            font-size: 3rem;
+            font-weight: 700;
+            text-align: center;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(135deg, var(--primary-light) 0%, var(--secondary) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle {
+            color: var(--text-secondary);
+            font-size: 1.25rem;
+            margin-bottom: 3rem;
+        }
+
+        .portal-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1.5rem;
+            max-width: 800px;
+            width: 100%;
+        }
+
+        .portal-card {
+            background: var(--bg-card);
+            border: 2px solid var(--border-color);
+            border-radius: var(--border-radius-lg);
+            padding: 2rem;
+            text-align: center;
+            text-decoration: none;
+            color: var(--text-primary);
+            transition: all var(--transition-normal);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .portal-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--primary) 0%, var(--secondary) 100%);
+            transform: scaleX(0);
+            transition: transform var(--transition-normal);
+        }
+
+        .portal-card:hover {
+            transform: translateY(-5px);
+            border-color: var(--primary);
+            box-shadow: var(--shadow-glow);
+        }
+
+        .portal-card:hover::before {
+            transform: scaleX(1);
+        }
+
+        .portal-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        .portal-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .portal-desc {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .portal-admin { --accent-color: #8b5cf6; }
+        .portal-player { --accent-color: #10b981; }
+        .portal-jury { --accent-color: #f59e0b; }
+        .portal-screen { --accent-color: #ef4444; }
+
+        .portal-admin:hover { border-color: #8b5cf6; box-shadow: 0 0 20px rgba(139, 92, 246, 0.3); }
+        .portal-player:hover { border-color: #10b981; box-shadow: 0 0 20px rgba(16, 185, 129, 0.3); }
+        .portal-jury:hover { border-color: #f59e0b; box-shadow: 0 0 20px rgba(245, 158, 11, 0.3); }
+        .portal-screen:hover { border-color: #ef4444; box-shadow: 0 0 20px rgba(239, 68, 68, 0.3); }
+
+        @media (max-width: 600px) {
+            .portal-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .title {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="landing-container">
+        <div class="logo">🎯</div>
+        <h1 class="title">Bilgi Yarışması</h1>
+        <p class="subtitle">LAN Tabanlı Gerçek Zamanlı Yarışma Platformu</p>
+
+        <div class="portal-grid">
+            <a href="/admin" class="portal-card portal-admin">
+                <div class="portal-icon">🎛️</div>
+                <div class="portal-title">Admin Paneli</div>
+                <div class="portal-desc">Yarışmayı yönet, soruları kontrol et</div>
+            </a>
+
+            <a href="/player" class="portal-card portal-player">
+                <div class="portal-icon">🎮</div>
+                <div class="portal-title">Yarışmacı</div>
+                <div class="portal-desc">Yarışmaya katıl ve sorulara cevap ver</div>
+            </a>
+
+            <a href="/jury" class="portal-card portal-jury">
+                <div class="portal-icon">⚖️</div>
+                <div class="portal-title">Jüri Paneli</div>
+                <div class="portal-desc">Açık uçlu cevapları değerlendir</div>
+            </a>
+
+            <a href="/screen" class="portal-card portal-screen">
+                <div class="portal-icon">📺</div>
+                <div class="portal-title">Seyirci Ekranı</div>
+                <div class="portal-desc">Canlı skorboard ve animasyonlar</div>
+            </a>
+        </div>
+    </div>
+</body>
+</html>
