@@ -27,12 +27,49 @@
 
         <!-- Main Content -->
         <main class="jury-main">
-            <!-- Waiting State -->
+            <!-- Idle/Waiting State -->
             <div class="state-panel" id="waitingPanel">
                 <div class="waiting-content">
                     <div class="waiting-icon">⏳</div>
-                    <h2>Değerlendirme Bekleniyor</h2>
-                    <p>Açık uçlu bir soru tamamlandığında değerlendirme burada görünecek</p>
+                    <h2 id="waitingTitle">Yarışma Bekleniyor</h2>
+                    <p id="waitingMessage">Yeni bir soru başlatıldığında burada gösterilecek</p>
+                </div>
+            </div>
+
+            <!-- Active Question State -->
+            <div class="state-panel hidden" id="activeQuestionPanel">
+                <div class="active-question-card card">
+                    <div class="question-header">
+                        <span class="question-badge" id="activeQuestionBadge">Soru #1</span>
+                        <span class="question-category" id="activeQuestionCategory">Genel Kültür</span>
+                        <span class="question-points" id="activeQuestionPoints">10 Puan</span>
+                    </div>
+                    <div class="question-content">
+                        <p class="question-text" id="activeQuestionText">Soru metni...</p>
+                    </div>
+                    <div class="question-type-info" id="questionTypeInfo">
+                        <span class="badge badge-warning">Açık Uçlu</span>
+                    </div>
+                    <div class="correct-answer-preview">
+                        <span class="label">Kabul Edilen Cevaplar:</span>
+                        <span class="answers" id="activeCorrectKeys">-</span>
+                    </div>
+                    <div class="timer-section">
+                        <div class="timer-display" id="timerDisplay">30</div>
+                        <div class="timer-label">saniye kaldı</div>
+                    </div>
+                    <div class="status-info">
+                        <span class="status-text">🟢 Cevaplar Alınıyor...</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Locked State (Waiting for Grading) -->
+            <div class="state-panel hidden" id="lockedPanel">
+                <div class="waiting-content">
+                    <div class="waiting-icon">🔒</div>
+                    <h2>Süre Doldu</h2>
+                    <p>Cevaplar değerlendirmeye hazırlanıyor...</p>
                 </div>
             </div>
 
@@ -119,10 +156,20 @@
             <!-- Results Shown State -->
             <div class="state-panel hidden" id="resultsPanel">
                 <div class="results-content">
-                    <div class="results-icon">✅</div>
+                    <div class="results-icon">🏆</div>
                     <h2>Değerlendirme Tamamlandı</h2>
-                    <p>Sonuçlar seyirci ekranında gösteriliyor</p>
-                    <p class="text-muted">Sonraki soru için bekleniyor...</p>
+                    <div class="result-details card">
+                        <div class="result-row">
+                            <span class="result-label">Soru:</span>
+                            <span class="result-value" id="resultQuestionText">-</span>
+                        </div>
+                        <div class="result-row correct-answer-row">
+                            <span class="result-label">Doğru Cevap:</span>
+                            <span class="result-value" id="resultCorrectAnswer">-</span>
+                        </div>
+                    </div>
+                    <p class="text-muted">Sonuçlar seyirci ekranında gösteriliyor...</p>
+                    <p class="text-muted">Sonraki soru için bekleniyor</p>
                 </div>
             </div>
         </main>

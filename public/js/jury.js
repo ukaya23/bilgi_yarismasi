@@ -7,6 +7,7 @@
 let socketManager;
 let currentQuestionId = null;
 let currentPoints = 0;
+let currentQuestion = null; // Aktif soru bilgisi
 let answerGroups = { correct: [], incorrect: [], empty: [] };
 let gradedAnswers = new Set();
 
@@ -48,10 +49,15 @@ function setupSocketEvents() {
         handleGameState(data);
     });
 
-    // Yeni soru (izleme amaçlı)
+    // Yeni soru
     socketManager.on('NEW_QUESTION', (data) => {
-        // Soru geldiğinde bekleme moduna geç
-        showPanel('waitingPanel');
+        currentQuestion = data;
+        showActiveQuestion(data);
+    });
+
+    // Zaman senkronizasyonu
+    socketManager.on('TIME_SYNC', (data) => {
+        updateTimer(data.timeRemaining);
     });
 
     // Jüri değerlendirme verileri
@@ -65,7 +71,7 @@ function setupSocketEvents() {
             showToast(`${data.action} başarılı`, 'success');
 
             if (data.action === 'COMMIT_RESULTS') {
-                showPanel('resultsPanel');
+                showResultsPanel();
             }
         } else {
             showToast(data.error || 'Bir hata oluştu', 'error');
@@ -74,13 +80,14 @@ function setupSocketEvents() {
 
     // Sonuçlar gösterildi
     socketManager.on('SHOW_RESULTS', (data) => {
-        showPanel('resultsPanel');
+        showResultsWithData(data);
     });
 
     // Oyun sıfırlama
     socketManager.on('GAME_RESET', () => {
         resetState();
         showPanel('waitingPanel');
+        updateWaitingMessage('Yarışma Sıfırlandı', 'Yeni bir yarışma bekleniyor...');
     });
 }
 
@@ -110,20 +117,90 @@ function showPanel(panelId) {
     document.getElementById(panelId).classList.remove('hidden');
 }
 
+function updateWaitingMessage(title, message) {
+    document.getElementById('waitingTitle').textContent = title;
+    document.getElementById('waitingMessage').textContent = message;
+}
+
+// ==================== ACTIVE QUESTION ====================
+
+function showActiveQuestion(question) {
+    document.getElementById('activeQuestionBadge').textContent = `Soru #${question.id}`;
+    document.getElementById('activeQuestionCategory').textContent = question.category || 'Genel Kültür';
+    document.getElementById('activeQuestionPoints').textContent = `${question.points} Puan`;
+    document.getElementById('activeQuestionText').textContent = question.content;
+    document.getElementById('activeCorrectKeys').textContent = question.correct_keys ? question.correct_keys.join(', ') : '-';
+    document.getElementById('timerDisplay').textContent = question.duration;
+
+    // Soru tipi
+    const typeInfo = document.getElementById('questionTypeInfo');
+    if (question.type === 'MULTIPLE_CHOICE') {
+        typeInfo.innerHTML = '<span class="badge badge-primary">Çoktan Seçmeli</span>';
+    } else {
+        typeInfo.innerHTML = '<span class="badge badge-warning">Açık Uçlu</span>';
+    }
+
+    showPanel('activeQuestionPanel');
+}
+
+function updateTimer(timeRemaining) {
+    const timerEl = document.getElementById('timerDisplay');
+    if (timerEl) {
+        timerEl.textContent = timeRemaining;
+
+        // Renk değişimi
+        if (timeRemaining <= 5) {
+            timerEl.classList.add('timer-critical');
+        } else if (timeRemaining <= 10) {
+            timerEl.classList.add('timer-warning');
+            timerEl.classList.remove('timer-critical');
+        } else {
+            timerEl.classList.remove('timer-warning', 'timer-critical');
+        }
+    }
+}
+
+// ==================== RESULTS PANEL ====================
+
+function showResultsPanel() {
+    if (currentQuestion) {
+        document.getElementById('resultQuestionText').textContent = currentQuestion.content || '-';
+        document.getElementById('resultCorrectAnswer').textContent =
+            currentQuestion.correct_keys ? currentQuestion.correct_keys.join(', ') : '-';
+    }
+    showPanel('resultsPanel');
+}
+
+function showResultsWithData(data) {
+    if (data.question) {
+        document.getElementById('resultQuestionText').textContent = data.question.content || '-';
+        document.getElementById('resultCorrectAnswer').textContent = data.question.correctAnswer || '-';
+    }
+    showPanel('resultsPanel');
+}
+
 // ==================== GAME STATE ====================
 
 function handleGameState(state) {
     switch (state.state) {
         case 'IDLE':
-        case 'QUESTION_ACTIVE':
-        case 'LOCKED':
             showPanel('waitingPanel');
+            updateWaitingMessage('Yarışma Bekleniyor', 'Yeni bir soru başlatıldığında burada gösterilecek');
+            break;
+        case 'QUESTION_ACTIVE':
+            // NEW_QUESTION event'i ile zaten gösterilecek; burada güvence
+            if (currentQuestion) {
+                showPanel('activeQuestionPanel');
+            }
+            break;
+        case 'LOCKED':
+            showPanel('lockedPanel');
             break;
         case 'GRADING':
             // JURY_REVIEW_DATA event'ini bekle
             break;
         case 'REVEAL':
-            showPanel('resultsPanel');
+            showResultsPanel();
             break;
     }
 }
