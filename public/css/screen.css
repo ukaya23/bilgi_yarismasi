@@ -350,12 +350,44 @@ body {
     font-weight: 800;
 }
 
-/* Results Screen */
-.results-main {
+/* Results Layout Transitions */
+.results-layout {
     display: flex;
-    flex-direction: column;
     gap: 2rem;
+    width: 100%;
     height: 100%;
+    transition: all 1s ease-in-out;
+}
+
+.results-main {
+    flex: 2;
+    transition: opacity 0.8s ease, transform 0.8s ease, flex 1s ease;
+    opacity: 1;
+}
+
+.leaderboard-panel {
+    flex: 1;
+    transition: all 1s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Full Screen Leaderboard Mode */
+.results-layout.full-leaderboard .results-main {
+    opacity: 0;
+    flex: 0;
+    pointer-events: none;
+    transform: translateX(-50px);
+    margin-right: -2rem;
+    /* Hide gap */
+}
+
+.results-layout.full-leaderboard .leaderboard-panel {
+    flex: 3;
+    transform: scale(1.05);
+}
+
+.results-layout.full-leaderboard .leaderboard-entry {
+    padding: 1rem 2rem;
+    /* Slightly larger entries in full screen */
 }
 
 .reveal-panel {

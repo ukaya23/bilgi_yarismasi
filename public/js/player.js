@@ -188,9 +188,11 @@ function updatePlayerInfo() {
 function handleGameState(state) {
     switch (state.state) {
         case 'IDLE':
+            resetLeaderboardView();
             showScreen('waitingScreen');
             break;
         case 'QUESTION_ACTIVE':
+            resetLeaderboardView();
             if (state.currentQuestion && !hasSubmitted) {
                 currentQuestion = state.currentQuestion;
                 showQuestion(state.currentQuestion);
@@ -205,6 +207,17 @@ function handleGameState(state) {
         case 'REVEAL':
             // Results will be shown via SHOW_RESULTS event
             break;
+    }
+}
+
+function resetLeaderboardView() {
+    const resultsContainer = document.querySelector('.results-container');
+    if (resultsContainer) {
+        resultsContainer.classList.remove('show-leaderboard');
+    }
+    const lbSection = document.getElementById('playerLeaderboardSection');
+    if (lbSection) {
+        lbSection.classList.add('hidden');
     }
 }
 
@@ -369,12 +382,36 @@ function showResults(data) {
         document.getElementById('scoreChange').textContent = '0';
     }
 
-    // 5 saniye sonra bekleme ekranına dön
+    // 5 saniye sonra sıralama ekranına geç
     setTimeout(() => {
-        if (document.getElementById('resultsScreen').classList.contains('hidden') === false) {
-            showScreen('waitingScreen');
+        if (!document.getElementById('resultsScreen').classList.contains('hidden')) {
+            renderPlayerLeaderboard(data.leaderboard);
+            document.querySelector('.results-container').classList.add('show-leaderboard');
+            document.getElementById('playerLeaderboardSection').classList.remove('hidden');
         }
     }, 5000);
+}
+
+function renderPlayerLeaderboard(leaderboard) {
+    const container = document.getElementById('playerLeaderboard');
+    container.innerHTML = '';
+
+    // İlk 10'u göster
+    leaderboard.slice(0, 10).forEach((entry, index) => {
+        const div = document.createElement('div');
+        div.className = `p-leaderboard-entry ${entry.id === playerData?.id ? 'is-me' : ''}`;
+        div.style.animationDelay = `${index * 0.1}s`;
+
+        div.innerHTML = `
+            <div class="p-rank">${index + 1}</div>
+            <div class="p-info">
+                <span class="p-name">${escapeHtml(entry.name)}</span>
+                <span class="p-table">Masa ${entry.table_no}</span>
+            </div>
+            <div class="p-score">${entry.total_score}</div>
+        `;
+        container.appendChild(div);
+    });
 }
 
 // ==================== HEARTBEAT ====================

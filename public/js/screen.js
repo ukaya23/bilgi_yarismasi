@@ -67,10 +67,24 @@ class CinematicManager {
         console.log('[CINEMATIC] Phase: Leaderboard');
         await this.playLeaderboardSequence(data.leaderboard);
 
+        // 6. Final Transition: Full Screen Leaderboard (3s after leaderboard settles)
+        await delay(3000);
+        console.log('[CINEMATIC] Phase: Full Screen Leaderboard Transition');
+        const resultsLayout = document.querySelector('.results-layout');
+        if (resultsLayout) {
+            resultsLayout.classList.add('full-leaderboard');
+        }
+
         this.isRevealing = false;
     }
 
     resetRevealState() {
+        // Reset full-screen mode
+        const resultsLayout = document.querySelector('.results-layout');
+        if (resultsLayout) {
+            resultsLayout.classList.remove('full-leaderboard');
+        }
+
         // Add classes to hide elements
         document.getElementById('revealQuestionBox').classList.add('reveal-step');
         document.getElementById('revealQuestionBox').classList.remove('visible');
