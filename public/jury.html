@@ -27,8 +27,35 @@
 
         <!-- Main Content -->
         <main class="jury-main">
+            <!-- Login Screen -->
+            <div class="state-panel" id="loginPanel">
+                <div class="login-box" style="max-width: 400px; margin: 0 auto;">
+                    <div class="login-header" style="text-align: center; margin-bottom: 2rem;">
+                        <div style="font-size: 3rem; margin-bottom: 1rem;">⚖️</div>
+                        <h2>Jüri Girişi</h2>
+                        <p style="color: var(--text-secondary);">Giriş kodunuzu girin</p>
+                    </div>
+
+                    <form id="juryLoginForm">
+                        <div class="form-group">
+                            <label class="form-label">Giriş Kodu (6 Haneli)</label>
+                            <input type="text" class="form-control form-control-lg" id="accessCode" placeholder="ABC123"
+                                required autocomplete="off" maxlength="6"
+                                style="text-transform: uppercase; letter-spacing: 0.5rem; font-size: 1.5rem; text-align: center;">
+                        </div>
+
+                        <div class="error-message" id="errorMessage"
+                            style="display: none; color: var(--danger); margin-bottom: 1rem;"></div>
+
+                        <button type="submit" class="btn btn-success btn-lg" id="loginBtn" style="width: 100%;">
+                            🔐 Giriş Yap
+                        </button>
+                    </form>
+                </div>
+            </div>
+
             <!-- Idle/Waiting State -->
-            <div class="state-panel" id="waitingPanel">
+            <div class="state-panel hidden" id="waitingPanel">
                 <div class="waiting-content">
                     <div class="waiting-icon">⏳</div>
                     <h2 id="waitingTitle">Yarışma Bekleniyor</h2>

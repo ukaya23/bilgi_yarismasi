@@ -381,10 +381,318 @@ function close() {
     }
 }
 
+// ==================== ADMIN İŞLEMLERİ ====================
+
+/**
+ * Admin kullanıcı doğrulama
+ */
+async function authenticateAdmin(username, password) {
+    const bcrypt = require('bcryptjs');
+    const admin = queryOne('SELECT * FROM admin_users WHERE username = ?', [username]);
+
+    if (!admin) {
+        return null;
+    }
+
+    const isValid = await bcrypt.compare(password, admin.password_hash);
+    return isValid ? admin : null;
+}
+
+/**
+ * Admin kullanıcı oluştur
+ */
+async function createAdminUser(username, password) {
+    const bcrypt = require('bcryptjs');
+    const existing = queryOne('SELECT id FROM admin_users WHERE username = ?', [username]);
+
+    if (existing) {
+        return { success: false, message: 'Bu kullanıcı adı zaten mevcut' };
+    }
+
+    const hash = await bcrypt.hash(password, 10);
+    const result = run('INSERT INTO admin_users (username, password_hash) VALUES (?, ?)', [username, hash]);
+
+    return { success: true, id: result.lastInsertRowid };
+}
+
+/**
+ * Varsayılan admin kullanıcısını oluştur (yoksa)
+ */
+async function ensureDefaultAdmin() {
+    const bcrypt = require('bcryptjs');
+    const admin = queryOne('SELECT id FROM admin_users WHERE username = ?', ['admin']);
+
+    if (!admin) {
+        const hash = await bcrypt.hash('admin123', 10);
+        run('INSERT INTO admin_users (username, password_hash) VALUES (?, ?)', ['admin', hash]);
+        console.log('Varsayılan admin kullanıcısı oluşturuldu: admin / admin123');
+    }
+}
+
+// ==================== YARIŞMA İŞLEMLERİ ====================
+
+/**
+ * Yarışma oluştur
+ */
+function createCompetition(name, contestantCount, juryCount) {
+    run(`
+        INSERT INTO competitions (name, contestant_count, jury_count) 
+        VALUES (?, ?, ?)
+    `, [name, contestantCount, juryCount]);
+
+    // sql.js'de lastInsertRowid güvenilir değil, doğrudan sorgula
+    const competition = queryOne('SELECT id FROM competitions WHERE name = ? ORDER BY id DESC LIMIT 1', [name]);
+    return competition ? competition.id : 0;
+}
+
+/**
+ * Tüm yarışmaları getir
+ */
+function getAllCompetitions() {
+    return query('SELECT * FROM competitions ORDER BY created_at DESC');
+}
+
+/**
+ * Aktif yarışmayı getir
+ */
+function getActiveCompetition() {
+    return queryOne('SELECT * FROM competitions WHERE status = "ACTIVE" ORDER BY created_at DESC LIMIT 1');
+}
+
+/**
+ * Yarışma durumunu güncelle
+ */
+function updateCompetitionStatus(id, status) {
+    return run('UPDATE competitions SET status = ? WHERE id = ?', [status, id]);
+}
+
+// ==================== ERİŞİM KODU İŞLEMLERİ ====================
+
+/**
+ * 6 haneli benzersiz kod üret
+ */
+function generateUniqueCode() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Karıştırılabilir karakterler çıkarıldı (0,O,1,I)
+    let code;
+    let attempts = 0;
+
+    do {
+        code = '';
+        for (let i = 0; i < 6; i++) {
+            code += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        attempts++;
+    } while (queryOne('SELECT id FROM access_codes WHERE code = ?', [code]) && attempts < 100);
+
+    return code;
+}
+
+/**
+ * Yarışma için erişim kodları oluştur
+ */
+function generateAccessCodes(competitionId, contestantCount, juryCount) {
+    const codes = [];
+
+    // Yarışmacı kodları
+    for (let i = 1; i <= contestantCount; i++) {
+        const code = generateUniqueCode();
+        run(`
+            INSERT INTO access_codes (competition_id, code, role, name, slot_number) 
+            VALUES (?, ?, 'CONTESTANT', ?, ?)
+        `, [competitionId, code, `Yarışmacı ${i}`, i]);
+        codes.push({ code, role: 'CONTESTANT', slot: i, name: `Yarışmacı ${i}` });
+    }
+
+    // Jüri kodları
+    for (let i = 1; i <= juryCount; i++) {
+        const code = generateUniqueCode();
+        run(`
+            INSERT INTO access_codes (competition_id, code, role, name, slot_number) 
+            VALUES (?, ?, 'JURY', ?, ?)
+        `, [competitionId, code, `Jüri ${i}`, i]);
+        codes.push({ code, role: 'JURY', slot: i, name: `Jüri ${i}` });
+    }
+
+    return codes;
+}
+
+/**
+ * Erişim kodunu doğrula
+ */
+function validateAccessCode(code) {
+    const accessCode = queryOne(`
+        SELECT ac.*, c.name as competition_name, c.status as competition_status
+        FROM access_codes ac
+        JOIN competitions c ON ac.competition_id = c.id
+        WHERE ac.code = ? AND c.status = 'ACTIVE'
+    `, [code.toUpperCase()]);
+
+    if (!accessCode) {
+        return { valid: false, message: 'Geçersiz veya kullanılmış kod' };
+    }
+
+    return { valid: true, accessCode };
+}
+
+/**
+ * Erişim kodunu kullanıldı olarak işaretle
+ */
+function markCodeAsUsed(codeId, sessionToken) {
+    return run(`
+        UPDATE access_codes 
+        SET is_used = 1, session_token = ?, used_at = CURRENT_TIMESTAMP 
+        WHERE id = ?
+    `, [sessionToken, codeId]);
+}
+
+/**
+ * Session token ile erişim kodunu doğrula
+ */
+function validateSessionToken(token) {
+    return queryOne(`
+        SELECT ac.*, c.name as competition_name
+        FROM access_codes ac
+        JOIN competitions c ON ac.competition_id = c.id
+        WHERE ac.session_token = ? AND c.status = 'ACTIVE'
+    `, [token]);
+}
+
+/**
+ * Yarışmaya ait kodları getir
+ */
+function getAccessCodesByCompetition(competitionId) {
+    return query(`
+        SELECT * FROM access_codes 
+        WHERE competition_id = ? 
+        ORDER BY role, slot_number
+    `, [competitionId]);
+}
+
+/**
+ * Erişim kodu ismini güncelle
+ */
+function updateAccessCodeName(codeId, name) {
+    return run('UPDATE access_codes SET name = ? WHERE id = ?', [name, codeId]);
+}
+
+/**
+ * Erişim kodunu sıfırla (yeni giriş için)
+ */
+function resetAccessCode(codeId) {
+    return run(`
+        UPDATE access_codes 
+        SET is_used = 0, session_token = NULL, used_at = NULL 
+        WHERE id = ?
+    `, [codeId]);
+}
+
+// ==================== AYAR İŞLEMLERİ ====================
+
+/**
+ * Ayar değerini getir
+ */
+function getSetting(key) {
+    const setting = queryOne('SELECT value FROM settings WHERE key = ?', [key]);
+    return setting ? setting.value : null;
+}
+
+/**
+ * Ayar değerini güncelle
+ */
+function setSetting(key, value) {
+    const existing = queryOne('SELECT id FROM settings WHERE key = ?', [key]);
+
+    if (existing) {
+        return run('UPDATE settings SET value = ? WHERE key = ?', [value, key]);
+    } else {
+        return run('INSERT INTO settings (key, value) VALUES (?, ?)', [key, value]);
+    }
+}
+
+/**
+ * Tüm ayarları getir
+ */
+function getAllSettings() {
+    return query('SELECT * FROM settings ORDER BY key');
+}
+
+/**
+ * Yeni tabloları oluştur (migration)
+ */
+function runMigrations() {
+    // Admin tablosu
+    db.run(`
+        CREATE TABLE IF NOT EXISTS admin_users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL UNIQUE,
+            password_hash TEXT NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    `);
+
+    // Yarışmalar tablosu
+    db.run(`
+        CREATE TABLE IF NOT EXISTS competitions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            contestant_count INTEGER NOT NULL DEFAULT 8,
+            jury_count INTEGER NOT NULL DEFAULT 2,
+            status TEXT DEFAULT 'ACTIVE' CHECK(status IN ('ACTIVE', 'COMPLETED', 'CANCELLED')),
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    `);
+
+    // Erişim kodları tablosu
+    db.run(`
+        CREATE TABLE IF NOT EXISTS access_codes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            competition_id INTEGER NOT NULL,
+            code TEXT NOT NULL UNIQUE,
+            role TEXT NOT NULL CHECK(role IN ('CONTESTANT', 'JURY')),
+            name TEXT NOT NULL DEFAULT 'İsimsiz',
+            slot_number INTEGER NOT NULL,
+            is_used INTEGER DEFAULT 0,
+            session_token TEXT,
+            used_at DATETIME,
+            FOREIGN KEY (competition_id) REFERENCES competitions(id)
+        )
+    `);
+
+    // Ayarlar tablosu
+    db.run(`
+        CREATE TABLE IF NOT EXISTS settings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            key TEXT NOT NULL UNIQUE,
+            value TEXT NOT NULL,
+            description TEXT
+        )
+    `);
+
+    // Varsayılan ayarlar
+    const defaultSettings = [
+        ['idle_quote_interval', '8', 'Bekleme ekranında alıntı değişim süresi (saniye)'],
+        ['question_warning_time', '10', 'Süre uyarısı başlangıcı (saniye kala)'],
+        ['result_display_duration', '15', 'Sonuç ekranı gösterim süresi (saniye)'],
+        ['sound_enabled', '1', 'Ses efektleri açık/kapalı'],
+        ['tick_sound_start', '10', 'Tik sesi başlangıcı (saniye kala)']
+    ];
+
+    for (const [key, value, desc] of defaultSettings) {
+        const existing = queryOne('SELECT id FROM settings WHERE key = ?', [key]);
+        if (!existing) {
+            run('INSERT INTO settings (key, value, description) VALUES (?, ?, ?)', [key, value, desc]);
+        }
+    }
+
+    saveToFile();
+    console.log('Veritabanı migrasyonları tamamlandı.');
+}
+
 module.exports = {
     initialize,
     getDb,
     close,
+    runMigrations,
     // Sorular
     getAllQuestions,
     getQuestionById,
@@ -410,5 +718,26 @@ module.exports = {
     getAllQuotes,
     // Oturum
     getOrCreateSession,
-    updateSessionState
+    updateSessionState,
+    // Admin
+    authenticateAdmin,
+    createAdminUser,
+    ensureDefaultAdmin,
+    // Yarışmalar
+    createCompetition,
+    getAllCompetitions,
+    getActiveCompetition,
+    updateCompetitionStatus,
+    // Erişim Kodları
+    generateAccessCodes,
+    validateAccessCode,
+    markCodeAsUsed,
+    validateSessionToken,
+    getAccessCodesByCompetition,
+    updateAccessCodeName,
+    resetAccessCode,
+    // Ayarlar
+    getSetting,
+    setSetting,
+    getAllSettings
 };

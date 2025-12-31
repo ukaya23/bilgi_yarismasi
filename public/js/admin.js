@@ -9,8 +9,38 @@ let questions = [];
 let contestants = [];
 let currentGameState = 'IDLE';
 let timer;
+let adminToken = null;
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    // Auth kontrolü
+    adminToken = localStorage.getItem('adminToken');
+    if (!adminToken) {
+        window.location.href = '/admin-login';
+        return;
+    }
+
+    // Oturum geçerliliğini kontrol et
+    try {
+        const response = await fetch('/api/auth/check-admin', {
+            headers: { 'X-Admin-Token': adminToken }
+        });
+        const data = await response.json();
+        if (!data.authenticated) {
+            localStorage.removeItem('adminToken');
+            window.location.href = '/admin-login';
+            return;
+        }
+        // Admin bilgilerini göster
+        const userDisplay = document.getElementById('adminUsername');
+        if (userDisplay) {
+            userDisplay.textContent = data.username;
+        }
+    } catch (error) {
+        console.error('Auth kontrol hatası:', error);
+        window.location.href = '/admin-login';
+        return;
+    }
+
     // Socket bağlantısı
     socketManager = new SocketManager('admin');
 
@@ -25,6 +55,10 @@ document.addEventListener('DOMContentLoaded', () => {
     setupNavigation();
     setupEventListeners();
     setupSocketEvents();
+
+    // Yarışma yönetimi
+    loadActiveCompetition();
+    loadSettings();
 });
 
 // ==================== NAVIGATION ====================
@@ -420,3 +454,269 @@ function deleteQuestion(id) {
         socketManager.emit('ADMIN_DELETE_QUESTION', { id });
     }
 }
+
+// ==================== COMPETITION MANAGEMENT ====================
+
+let activeCompetition = null;
+let competitionCodes = [];
+
+async function loadActiveCompetition() {
+    try {
+        const response = await fetch('/api/competition/active');
+        const data = await response.json();
+
+        if (data.active) {
+            activeCompetition = data.competition;
+            competitionCodes = data.codes;
+            renderCompetitionInfo();
+        } else {
+            renderNoCompetition();
+        }
+    } catch (error) {
+        console.error('Yarışma yükleme hatası:', error);
+    }
+}
+
+function renderCompetitionInfo() {
+    const container = document.getElementById('competitionInfo');
+    if (!container) return;
+
+    const contestantCodes = competitionCodes.filter(c => c.role === 'CONTESTANT');
+    const juryCodes = competitionCodes.filter(c => c.role === 'JURY');
+
+    container.innerHTML = `
+        <div class="competition-header">
+            <h3>📋 ${activeCompetition.name}</h3>
+            <span class="badge badge-success">Aktif</span>
+        </div>
+        
+        <div class="codes-section">
+            <h4>👥 Yarışmacı Kodları</h4>
+            <div class="codes-grid">
+                ${contestantCodes.map(c => `
+                    <div class="code-card ${c.is_used ? 'used' : ''}">
+                        <div class="code-value">${c.code}</div>
+                        <input type="text" class="code-name-input" value="${c.name}" 
+                               onchange="updateCodeName(${c.id}, this.value)" placeholder="İsim girin">
+                        <div class="code-status">${c.is_used ? '✅ Giriş yapıldı' : '⏳ Bekliyor'}</div>
+                        ${c.is_used ? `<button class="btn btn-sm btn-secondary" onclick="resetCode(${c.id})">Sıfırla</button>` : ''}
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+        
+        <div class="codes-section">
+            <h4>⚖️ Jüri Kodları</h4>
+            <div class="codes-grid">
+                ${juryCodes.map(c => `
+                    <div class="code-card ${c.is_used ? 'used' : ''}">
+                        <div class="code-value">${c.code}</div>
+                        <input type="text" class="code-name-input" value="${c.name}" 
+                               onchange="updateCodeName(${c.id}, this.value)" placeholder="İsim girin">
+                        <div class="code-status">${c.is_used ? '✅ Giriş yapıldı' : '⏳ Bekliyor'}</div>
+                        ${c.is_used ? `<button class="btn btn-sm btn-secondary" onclick="resetCode(${c.id})">Sıfırla</button>` : ''}
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+        
+        <button class="btn btn-danger mt-2" onclick="endCompetition()">Yarışmayı Sonlandır</button>
+    `;
+}
+
+function renderNoCompetition() {
+    const container = document.getElementById('competitionInfo');
+    if (!container) return;
+
+    container.innerHTML = `
+        <div class="no-competition">
+            <p class="text-muted">Aktif yarışma yok. Yeni yarışma oluşturun.</p>
+        </div>
+    `;
+}
+
+async function createCompetition() {
+    const name = document.getElementById('competitionName').value.trim();
+    const contestantCount = parseInt(document.getElementById('contestantCount').value);
+    const juryCount = parseInt(document.getElementById('juryCount').value);
+
+    if (!name) {
+        showToast('Yarışma adı gerekli', 'error');
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/competition', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Admin-Token': adminToken
+            },
+            body: JSON.stringify({ name, contestantCount, juryCount })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            showToast('Yarışma oluşturuldu!', 'success');
+            loadActiveCompetition();
+            closeCompetitionModal();
+        } else {
+            showToast(data.error || 'Hata oluştu', 'error');
+        }
+    } catch (error) {
+        console.error('Yarışma oluşturma hatası:', error);
+        showToast('Sunucu hatası', 'error');
+    }
+}
+
+async function updateCodeName(codeId, name) {
+    try {
+        await fetch(`/api/competition/code/${codeId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Admin-Token': adminToken
+            },
+            body: JSON.stringify({ name })
+        });
+    } catch (error) {
+        console.error('Kod güncelleme hatası:', error);
+    }
+}
+
+async function resetCode(codeId) {
+    if (!confirm('Bu kodu sıfırlamak istediğinize emin misiniz?')) return;
+
+    try {
+        await fetch(`/api/competition/code/${codeId}/reset`, {
+            method: 'POST',
+            headers: { 'X-Admin-Token': adminToken }
+        });
+        loadActiveCompetition();
+        showToast('Kod sıfırlandı', 'success');
+    } catch (error) {
+        console.error('Kod sıfırlama hatası:', error);
+    }
+}
+
+function endCompetition() {
+    if (confirm('Yarışmayı sonlandırmak istediğinize emin misiniz?')) {
+        // API çağrısı yapılabilir, şimdilik sadece UI güncelle
+        activeCompetition = null;
+        competitionCodes = [];
+        renderNoCompetition();
+    }
+}
+
+function openCompetitionModal() {
+    document.getElementById('competitionModal').classList.add('active');
+}
+
+function closeCompetitionModal() {
+    document.getElementById('competitionModal').classList.remove('active');
+}
+
+// ==================== SETTINGS ====================
+
+let appSettings = {};
+
+async function loadSettings() {
+    try {
+        const response = await fetch('/api/settings');
+        const settings = await response.json();
+
+        appSettings = {};
+        settings.forEach(s => {
+            appSettings[s.key] = s.value;
+        });
+
+        renderSettings();
+    } catch (error) {
+        console.error('Ayarlar yükleme hatası:', error);
+    }
+}
+
+function renderSettings() {
+    const container = document.getElementById('settingsForm');
+    if (!container) return;
+
+    container.innerHTML = `
+        <div class="form-group">
+            <label class="form-label">Bekleme Ekranı Alıntı Süresi (saniye)</label>
+            <input type="number" class="form-control" id="setting_idle_quote_interval" 
+                   value="${appSettings.idle_quote_interval || 8}" min="3" max="30">
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label">Süre Uyarısı Başlangıcı (saniye kala)</label>
+            <input type="number" class="form-control" id="setting_question_warning_time" 
+                   value="${appSettings.question_warning_time || 10}" min="5" max="30">
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label">Sonuç Ekranı Gösterim Süresi (saniye)</label>
+            <input type="number" class="form-control" id="setting_result_display_duration" 
+                   value="${appSettings.result_display_duration || 15}" min="5" max="60">
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label">Tik Sesi Başlangıcı (saniye kala)</label>
+            <input type="number" class="form-control" id="setting_tick_sound_start" 
+                   value="${appSettings.tick_sound_start || 10}" min="3" max="30">
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label">
+                <input type="checkbox" id="setting_sound_enabled" 
+                       ${appSettings.sound_enabled === '1' ? 'checked' : ''}>
+                Ses Efektleri Açık
+            </label>
+        </div>
+        
+        <button class="btn btn-primary" onclick="saveSettings()">💾 Ayarları Kaydet</button>
+    `;
+}
+
+async function saveSettings() {
+    const settings = {
+        idle_quote_interval: document.getElementById('setting_idle_quote_interval').value,
+        question_warning_time: document.getElementById('setting_question_warning_time').value,
+        result_display_duration: document.getElementById('setting_result_display_duration').value,
+        tick_sound_start: document.getElementById('setting_tick_sound_start').value,
+        sound_enabled: document.getElementById('setting_sound_enabled').checked ? '1' : '0'
+    };
+
+    try {
+        for (const [key, value] of Object.entries(settings)) {
+            await fetch(`/api/settings/${key}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Admin-Token': adminToken
+                },
+                body: JSON.stringify({ value })
+            });
+        }
+
+        showToast('Ayarlar kaydedildi', 'success');
+        appSettings = settings;
+    } catch (error) {
+        console.error('Ayar kaydetme hatası:', error);
+        showToast('Hata oluştu', 'error');
+    }
+}
+
+// ==================== LOGOUT ====================
+
+function logout() {
+    fetch('/api/auth/admin-logout', {
+        method: 'POST',
+        headers: { 'X-Admin-Token': adminToken }
+    }).finally(() => {
+        localStorage.removeItem('adminToken');
+        localStorage.removeItem('adminUsername');
+        window.location.href = '/admin-login';
+    });
+}
+

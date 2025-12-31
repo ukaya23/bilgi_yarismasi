@@ -22,6 +22,9 @@
                 <a href="#" class="nav-item active" data-section="dashboard">
                     <span>📊</span> Dashboard
                 </a>
+                <a href="#" class="nav-item" data-section="competition">
+                    <span>🏆</span> Yarışma Yönetimi
+                </a>
                 <a href="#" class="nav-item" data-section="questions">
                     <span>❓</span> Sorular
                 </a>
@@ -34,6 +37,10 @@
             </nav>
 
             <div class="sidebar-footer">
+                <div class="admin-info">
+                    <span class="admin-username">👤 <span id="adminUsername">Admin</span></span>
+                    <button class="btn btn-sm btn-secondary" onclick="logout()">Çıkış</button>
+                </div>
                 <div class="connection-status">
                     <span class="status-dot" id="connectionDot"></span>
                     <span id="connectionText">Bağlanıyor...</span>
@@ -196,6 +203,24 @@
                 </div>
             </section>
 
+            <!-- Competition Section -->
+            <section id="competition-section" class="section">
+                <header class="section-header">
+                    <h1>Yarışma Yönetimi</h1>
+                    <button class="btn btn-primary" onclick="openCompetitionModal()">
+                        ➕ Yeni Yarışma
+                    </button>
+                </header>
+
+                <div class="card">
+                    <div id="competitionInfo">
+                        <div class="empty-state">
+                            <p>Yükleniyor...</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
             <!-- Settings Section -->
             <section id="settings-section" class="section">
                 <header class="section-header">
@@ -203,9 +228,16 @@
                 </header>
 
                 <div class="card">
+                    <h3>⏱️ Zamanlama Ayarları</h3>
+                    <div id="settingsForm">
+                        <p class="text-muted">Yükleniyor...</p>
+                    </div>
+                </div>
+
+                <div class="card mt-2">
                     <h3>🔧 Sistem Bilgileri</h3>
                     <p><strong>Sunucu:</strong> <span id="serverInfo">192.168.1.100:3000</span></p>
-                    <p><strong>Versiyon:</strong> 1.0.0</p>
+                    <p><strong>Versiyon:</strong> 2.0.0</p>
                 </div>
             </section>
         </main>
@@ -270,6 +302,40 @@
             <div class="modal-footer">
                 <button class="btn btn-secondary" id="cancelModalBtn">İptal</button>
                 <button class="btn btn-success" id="saveQuestionBtn">Kaydet</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Competition Modal -->
+    <div class="modal" id="competitionModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Yeni Yarışma Oluştur</h3>
+                <button class="btn btn-icon" onclick="closeCompetitionModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Yarışma Adı</label>
+                    <input type="text" class="form-control" id="competitionName" placeholder="Örn: 2024 Bilgi Yarışması"
+                        required>
+                </div>
+
+                <div class="grid grid-2">
+                    <div class="form-group">
+                        <label class="form-label">Yarışmacı Sayısı</label>
+                        <input type="number" class="form-control" id="contestantCount" value="8" min="2" max="50">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Jüri Sayısı</label>
+                        <input type="number" class="form-control" id="juryCount" value="2" min="1" max="10">
+                    </div>
+                </div>
+
+                <p class="text-muted">Her yarışmacı ve jüri için 6 haneli benzersiz giriş kodu oluşturulacak.</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeCompetitionModal()">İptal</button>
+                <button class="btn btn-success" onclick="createCompetition()">Oluştur</button>
             </div>
         </div>
     </div>

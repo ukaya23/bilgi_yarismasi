@@ -16,23 +16,20 @@
             <div class="login-header">
                 <div class="logo-icon">🎮</div>
                 <h1>Bilgi Yarışması</h1>
-                <p>Yarışmaya katılmak için bilgilerinizi girin</p>
+                <p>Yarışmaya katılmak için giriş kodunuzu girin</p>
             </div>
 
             <form id="loginForm">
                 <div class="form-group">
-                    <label class="form-label">Adınız Soyadınız</label>
-                    <input type="text" class="form-control form-control-lg" id="playerName"
-                        placeholder="Örn: Ahmet Yılmaz" required autocomplete="off">
+                    <label class="form-label">Giriş Kodu (6 Haneli)</label>
+                    <input type="text" class="form-control form-control-lg code-input" id="accessCode"
+                        placeholder="ABC123" required autocomplete="off" maxlength="6"
+                        style="text-transform: uppercase; letter-spacing: 0.5rem; font-size: 1.5rem; text-align: center;">
                 </div>
 
-                <div class="form-group">
-                    <label class="form-label">Masa Numarası</label>
-                    <input type="number" class="form-control form-control-lg" id="tableNo" placeholder="Örn: 1" required
-                        min="1" max="50" autocomplete="off">
-                </div>
+                <div class="error-message" id="errorMessage" style="display: none;"></div>
 
-                <button type="submit" class="btn btn-success btn-lg btn-block">
+                <button type="submit" class="btn btn-success btn-lg btn-block" id="loginBtn">
                     🚀 Yarışmaya Katıl
                 </button>
             </form>

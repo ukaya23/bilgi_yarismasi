@@ -259,13 +259,25 @@ document.addEventListener('DOMContentLoaded', () => {
     socketManager = new SocketManager('screen');
     cinematicManager = new CinematicManager();
 
+    // Initialize sound manager
+    if (typeof soundManager !== 'undefined') {
+        soundManager.init();
+    }
+
     timer = new Timer(
         document.getElementById('timerValue'),
         (timeLeft) => {
             const timerEl = document.getElementById('timerValue');
             timerEl.classList.remove('warning', 'danger');
-            if (timeLeft <= 5) timerEl.classList.add('danger');
-            else if (timeLeft <= 10) timerEl.classList.add('warning');
+            if (timeLeft <= 5) {
+                timerEl.classList.add('danger');
+            } else if (timeLeft <= 10) {
+                timerEl.classList.add('warning');
+                // Play tick sound during warning phase
+                if (typeof soundManager !== 'undefined') {
+                    soundManager.playTick();
+                }
+            }
         },
         null
     );
@@ -324,6 +336,10 @@ function setupSocketEvents() {
     });
 
     socketManager.on('SHOW_RESULTS', (data) => {
+        // Play results sound
+        if (typeof soundManager !== 'undefined') {
+            soundManager.playResults();
+        }
         // Trigger Cinematic Reveal
         cinematicManager.playRevealSequence(data);
     });
@@ -401,6 +417,12 @@ function updateContestantsPreview() {
 
 function showQuestionScreen(data) {
     showScreen('questionScreen');
+
+    // Play question start sound
+    if (typeof soundManager !== 'undefined') {
+        soundManager.playQuestionStart();
+    }
+
     timer.start(data.duration);
     document.getElementById('timerValue').classList.remove('warning', 'danger');
     document.getElementById('categoryValue').textContent = data.category || 'Genel Kültür';

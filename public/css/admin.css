@@ -310,3 +310,114 @@ tbody tr {
         width: 100%;
     }
 }
+
+/* Admin Info */
+.admin-info {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.admin-username {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+}
+
+/* Competition Management */
+.competition-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.competition-header h3 {
+    margin: 0;
+    font-size: 1.25rem;
+}
+
+.codes-section {
+    margin-bottom: 2rem;
+}
+
+.codes-section h4 {
+    font-size: 1rem;
+    margin-bottom: 1rem;
+    color: var(--text-secondary);
+}
+
+.codes-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 1rem;
+}
+
+.code-card {
+    background: var(--bg-darker);
+    border: 2px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: 1rem;
+    text-align: center;
+    transition: all var(--transition-fast);
+}
+
+.code-card.used {
+    border-color: var(--success);
+    background: rgba(16, 185, 129, 0.05);
+}
+
+.code-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    font-family: 'Consolas', 'Monaco', monospace;
+    letter-spacing: 0.2rem;
+    color: var(--primary-light);
+    margin-bottom: 0.75rem;
+    background: var(--bg-card);
+    padding: 0.5rem;
+    border-radius: var(--border-radius-sm);
+}
+
+.code-name-input {
+    width: 100%;
+    padding: 0.5rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-sm);
+    color: var(--text-primary);
+    font-size: 0.875rem;
+    text-align: center;
+    margin-bottom: 0.5rem;
+}
+
+.code-name-input:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+
+.code-status {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-bottom: 0.5rem;
+}
+
+.no-competition {
+    text-align: center;
+    padding: 3rem 1rem;
+}
+
+/* Error Message */
+.error-message {
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid var(--danger);
+    border-radius: var(--border-radius);
+    padding: 0.75rem 1rem;
+    color: var(--danger);
+    font-size: 0.875rem;
+    margin-bottom: 1rem;
+}

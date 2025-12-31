@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="tr">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -98,27 +99,54 @@
             font-size: 0.9rem;
         }
 
-        .portal-admin { --accent-color: #8b5cf6; }
-        .portal-player { --accent-color: #10b981; }
-        .portal-jury { --accent-color: #f59e0b; }
-        .portal-screen { --accent-color: #ef4444; }
+        .portal-admin {
+            --accent-color: #8b5cf6;
+        }
 
-        .portal-admin:hover { border-color: #8b5cf6; box-shadow: 0 0 20px rgba(139, 92, 246, 0.3); }
-        .portal-player:hover { border-color: #10b981; box-shadow: 0 0 20px rgba(16, 185, 129, 0.3); }
-        .portal-jury:hover { border-color: #f59e0b; box-shadow: 0 0 20px rgba(245, 158, 11, 0.3); }
-        .portal-screen:hover { border-color: #ef4444; box-shadow: 0 0 20px rgba(239, 68, 68, 0.3); }
+        .portal-player {
+            --accent-color: #10b981;
+        }
+
+        .portal-jury {
+            --accent-color: #f59e0b;
+        }
+
+        .portal-screen {
+            --accent-color: #ef4444;
+        }
+
+        .portal-admin:hover {
+            border-color: #8b5cf6;
+            box-shadow: 0 0 20px rgba(139, 92, 246, 0.3);
+        }
+
+        .portal-player:hover {
+            border-color: #10b981;
+            box-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
+        }
+
+        .portal-jury:hover {
+            border-color: #f59e0b;
+            box-shadow: 0 0 20px rgba(245, 158, 11, 0.3);
+        }
+
+        .portal-screen:hover {
+            border-color: #ef4444;
+            box-shadow: 0 0 20px rgba(239, 68, 68, 0.3);
+        }
 
         @media (max-width: 600px) {
             .portal-grid {
                 grid-template-columns: 1fr;
             }
-            
+
             .title {
                 font-size: 2rem;
             }
         }
     </style>
 </head>
+
 <body>
     <div class="landing-container">
         <div class="logo">🎯</div>
@@ -126,7 +154,7 @@
         <p class="subtitle">LAN Tabanlı Gerçek Zamanlı Yarışma Platformu</p>
 
         <div class="portal-grid">
-            <a href="/admin" class="portal-card portal-admin">
+            <a href="/admin-login" class="portal-card portal-admin">
                 <div class="portal-icon">🎛️</div>
                 <div class="portal-title">Admin Paneli</div>
                 <div class="portal-desc">Yarışmayı yönet, soruları kontrol et</div>
@@ -152,4 +180,5 @@
         </div>
     </div>
 </body>
+
 </html>

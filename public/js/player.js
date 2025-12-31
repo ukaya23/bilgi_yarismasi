@@ -10,13 +10,11 @@ let playerData = null;
 let currentQuestion = null;
 let selectedAnswer = null;
 let hasSubmitted = false;
+let sessionToken = null;
 
 // ==================== INITIALIZATION ====================
 
-document.addEventListener('DOMContentLoaded', () => {
-    // Socket bağlantısı
-    socketManager = new SocketManager('player');
-
+document.addEventListener('DOMContentLoaded', async () => {
     // Timer
     timer = new Timer(
         document.getElementById('questionTimer'),
@@ -34,28 +32,66 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     );
 
-    // Check for saved login
-    const savedPlayer = storage.get('playerData');
-    if (savedPlayer) {
-        document.getElementById('playerName').value = savedPlayer.name || '';
-        document.getElementById('tableNo').value = savedPlayer.tableNo || '';
+    // Check for existing session
+    sessionToken = localStorage.getItem('playerSessionToken');
+    if (sessionToken) {
+        const isValid = await validateExistingSession();
+        if (isValid) {
+            initializeSocket();
+            return;
+        }
     }
 
     // Event listeners
     setupEventListeners();
-    setupSocketEvents();
 
     // Connection status
     updateConnectionStatus();
 });
 
+async function validateExistingSession() {
+    try {
+        const response = await fetch('/api/auth/validate-session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sessionToken })
+        });
+        const data = await response.json();
+
+        if (data.valid && data.role === 'CONTESTANT') {
+            playerData = {
+                name: data.name,
+                tableNo: data.slotNumber,
+                competitionName: data.competitionName
+            };
+            return true;
+        }
+    } catch (error) {
+        console.error('Session validation error:', error);
+    }
+
+    localStorage.removeItem('playerSessionToken');
+    sessionToken = null;
+    return false;
+}
+
+function initializeSocket() {
+    // Socket bağlantısı
+    socketManager = new SocketManager('player');
+    setupSocketEvents();
+    updateConnectionStatus();
+
+    showScreen('waitingScreen');
+    updatePlayerInfo();
+}
+
 // ==================== EVENT LISTENERS ====================
 
 function setupEventListeners() {
     // Login form
-    document.getElementById('loginForm').addEventListener('submit', (e) => {
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
         e.preventDefault();
-        login();
+        await login();
     });
 
     // Submit answer button (open-ended)
@@ -68,25 +104,34 @@ function setupEventListeners() {
             submitAnswer();
         }
     });
+
+    // Auto uppercase for code input
+    const codeInput = document.getElementById('accessCode');
+    if (codeInput) {
+        codeInput.addEventListener('input', (e) => {
+            e.target.value = e.target.value.toUpperCase();
+        });
+    }
 }
 
 // ==================== SOCKET EVENTS ====================
 
 function setupSocketEvents() {
+    // Socket bağlantı sonrası login gönder
+    socketManager.on('INIT_DATA', () => {
+        if (playerData) {
+            // Yarışmacı olarak kaydol
+            socketManager.emit('PLAYER_LOGIN', {
+                name: playerData.name,
+                tableNo: playerData.tableNo
+            });
+        }
+    });
+
     // Login sonucu
     socketManager.on('LOGIN_RESULT', (data) => {
         if (data.success) {
-            playerData = {
-                id: data.contestantId,
-                name: data.name,
-                tableNo: data.tableNo
-            };
-
-            // Save to localStorage
-            storage.set('playerData', playerData);
-
-            showScreen('waitingScreen');
-            updatePlayerInfo();
+            playerData.id = data.contestantId;
             showToast('Başarıyla giriş yapıldı!', 'success');
         } else {
             showToast(data.error || 'Giriş başarısız', 'error');
@@ -140,14 +185,14 @@ function updateConnectionStatus() {
     const text = document.getElementById('connectionText');
 
     setInterval(() => {
-        if (socketManager.isConnected) {
+        if (socketManager && socketManager.isConnected) {
             dot.classList.add('status-online');
             dot.classList.remove('status-offline');
             text.textContent = 'Bağlı';
         } else {
             dot.classList.remove('status-online');
             dot.classList.add('status-offline');
-            text.textContent = 'Bağlantı yok';
+            text.textContent = sessionToken ? 'Bağlanıyor...' : 'Bağlantı yok';
         }
     }, 1000);
 }
@@ -161,19 +206,58 @@ function showScreen(screenId) {
 
 // ==================== LOGIN ====================
 
-function login() {
-    const name = document.getElementById('playerName').value.trim();
-    const tableNo = document.getElementById('tableNo').value;
+async function login() {
+    const code = document.getElementById('accessCode').value.trim().toUpperCase();
+    const errorEl = document.getElementById('errorMessage');
+    const loginBtn = document.getElementById('loginBtn');
 
-    if (!name || !tableNo) {
-        showToast('Lütfen tüm alanları doldurun', 'error');
+    if (!code || code.length !== 6) {
+        errorEl.textContent = 'Lütfen 6 haneli kodu girin';
+        errorEl.style.display = 'block';
         return;
     }
 
-    socketManager.emit('PLAYER_LOGIN', {
-        name: name,
-        tableNo: parseInt(tableNo)
-    });
+    loginBtn.disabled = true;
+    errorEl.style.display = 'none';
+
+    try {
+        const response = await fetch('/api/auth/validate-code', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code })
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.success) {
+            if (data.role !== 'CONTESTANT') {
+                errorEl.textContent = 'Bu kod yarışmacı kodu değil';
+                errorEl.style.display = 'block';
+                loginBtn.disabled = false;
+                return;
+            }
+
+            sessionToken = data.sessionToken;
+            localStorage.setItem('playerSessionToken', sessionToken);
+
+            playerData = {
+                name: data.name,
+                tableNo: data.slotNumber,
+                competitionName: data.competitionName
+            };
+
+            initializeSocket();
+        } else {
+            errorEl.textContent = data.error || 'Geçersiz kod';
+            errorEl.style.display = 'block';
+        }
+    } catch (error) {
+        console.error('Login error:', error);
+        errorEl.textContent = 'Sunucu bağlantı hatası';
+        errorEl.style.display = 'block';
+    } finally {
+        loginBtn.disabled = false;
+    }
 }
 
 function updatePlayerInfo() {

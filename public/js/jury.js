@@ -10,20 +10,138 @@ let currentPoints = 0;
 let currentQuestion = null; // Aktif soru bilgisi
 let answerGroups = { correct: [], incorrect: [], empty: [] };
 let gradedAnswers = new Set();
+let sessionToken = null;
+let juryData = null;
 
 // ==================== INITIALIZATION ====================
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    // Check for existing session
+    sessionToken = localStorage.getItem('jurySessionToken');
+    if (sessionToken) {
+        const isValid = await validateExistingSession();
+        if (isValid) {
+            initializeSocket();
+            return;
+        }
+    }
+
+    // Event listeners for login
+    setupLoginListeners();
+
+    // Connection status
+    updateConnectionStatus();
+});
+
+async function validateExistingSession() {
+    try {
+        const response = await fetch('/api/auth/validate-session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sessionToken })
+        });
+        const data = await response.json();
+
+        if (data.valid && data.role === 'JURY') {
+            juryData = {
+                name: data.name,
+                slotNumber: data.slotNumber,
+                competitionName: data.competitionName
+            };
+            return true;
+        }
+    } catch (error) {
+        console.error('Session validation error:', error);
+    }
+
+    localStorage.removeItem('jurySessionToken');
+    sessionToken = null;
+    return false;
+}
+
+function initializeSocket() {
     // Socket bağlantısı
     socketManager = new SocketManager('jury');
 
     // Event listeners
     setupEventListeners();
     setupSocketEvents();
-
-    // Connection status
     updateConnectionStatus();
-});
+
+    showPanel('waitingPanel');
+}
+
+function setupLoginListeners() {
+    const loginForm = document.getElementById('juryLoginForm');
+    if (loginForm) {
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            await login();
+        });
+    }
+
+    // Auto uppercase for code input
+    const codeInput = document.getElementById('accessCode');
+    if (codeInput) {
+        codeInput.addEventListener('input', (e) => {
+            e.target.value = e.target.value.toUpperCase();
+        });
+    }
+}
+
+async function login() {
+    const code = document.getElementById('accessCode').value.trim().toUpperCase();
+    const errorEl = document.getElementById('errorMessage');
+    const loginBtn = document.getElementById('loginBtn');
+
+    if (!code || code.length !== 6) {
+        errorEl.textContent = 'Lütfen 6 haneli kodu girin';
+        errorEl.style.display = 'block';
+        return;
+    }
+
+    loginBtn.disabled = true;
+    errorEl.style.display = 'none';
+
+    try {
+        const response = await fetch('/api/auth/validate-code', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code })
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.success) {
+            if (data.role !== 'JURY') {
+                errorEl.textContent = 'Bu kod jüri kodu değil';
+                errorEl.style.display = 'block';
+                loginBtn.disabled = false;
+                return;
+            }
+
+            sessionToken = data.sessionToken;
+            localStorage.setItem('jurySessionToken', sessionToken);
+
+            juryData = {
+                name: data.name,
+                slotNumber: data.slotNumber,
+                competitionName: data.competitionName
+            };
+
+            initializeSocket();
+        } else {
+            errorEl.textContent = data.error || 'Geçersiz kod';
+            errorEl.style.display = 'block';
+        }
+    } catch (error) {
+        console.error('Login error:', error);
+        errorEl.textContent = 'Sunucu bağlantı hatası';
+        errorEl.style.display = 'block';
+    } finally {
+        loginBtn.disabled = false;
+    }
+}
 
 // ==================== EVENT LISTENERS ====================
 
