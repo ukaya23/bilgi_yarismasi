@@ -28,8 +28,9 @@ class CinematicManager {
         console.log('[CINEMATIC] Starting reveal sequence...');
 
         // 1. Initial State: Hide everything, show suspense
-        showScreen('resultsScreen');
+        showResultsScreen(data); // Populate text
         this.resetRevealState();
+        showScreen('resultsScreen');
 
         // Wait for suspense (3s) - User said "bir kaç saniye beklesin"
         await delay(3000);
@@ -148,7 +149,7 @@ class CinematicManager {
             const oldP = startData.find(o => o.id === p.id) || { ...p, total_score: 0, rank: 999 };
             // Calculate old rank
             const oldRankIdx = startData.findIndex(o => o.id === p.id);
-            const initialTop = (oldRankIdx !== -1 ? oldRankIdx : i) * 70; // approx height + gap
+            const initialTop = (oldRankIdx !== -1 ? oldRankIdx : i) * 80; // height + gap
 
             const card = this.createLeaderboardCard(p, oldP.total_score, oldRankIdx !== -1 ? oldRankIdx : i);
             // Force absolute position
@@ -178,7 +179,7 @@ class CinematicManager {
         // 3. Reorder (FLIP)
         newData.forEach((p, newIndex) => {
             const card = cardMap.get(p.id);
-            const newTop = newIndex * 70; // Height + gap
+            const newTop = newIndex * 80; // Height + gap
 
             // Apply new position
             card.style.top = `${newTop}px`;
