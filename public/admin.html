@@ -287,6 +287,32 @@
                             placeholder="Doğru cevap"></textarea>
                     </div>
 
+                    <!-- Resim Yükleme Bölümü -->
+                    <div class="form-group">
+                        <label class="form-label">Soru Görseli (Opsiyonel)</label>
+                        <div class="image-upload-container" id="imageUploadContainer">
+                            <input type="hidden" id="questionMediaUrl">
+                            <div class="image-preview" id="imagePreview">
+                                <img id="previewImage" src="" alt="Önizleme">
+                                <button type="button" class="btn btn-danger btn-sm remove-image-btn" id="removeImageBtn"
+                                    title="Resmi Kaldır">✕</button>
+                            </div>
+                            <div class="image-upload-area" id="imageUploadArea">
+                                <input type="file" id="imageInput" accept="image/jpeg,image/png,image/gif,image/webp"
+                                    hidden>
+                                <div class="upload-placeholder" onclick="document.getElementById('imageInput').click()">
+                                    <span class="upload-icon">📷</span>
+                                    <span class="upload-text">Resim yüklemek için tıklayın</span>
+                                    <span class="upload-hint">JPEG, PNG, GIF veya WEBP (max 10MB)</span>
+                                </div>
+                                <div class="upload-progress hidden" id="uploadProgress">
+                                    <div class="spinner"></div>
+                                    <span>Yükleniyor...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="grid grid-2">
                         <div class="form-group">
                             <label class="form-label">Puan</label>

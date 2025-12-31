@@ -9,6 +9,37 @@ const { createServer } = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
+const multer = require('multer');
+const fs = require('fs');
+
+// Multer konfigürasyonu - Resim yükleme
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        const uploadsDir = path.join(__dirname, 'public', 'uploads');
+        if (!fs.existsSync(uploadsDir)) {
+            fs.mkdirSync(uploadsDir, { recursive: true });
+        }
+        cb(null, uploadsDir);
+    },
+    filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        const ext = path.extname(file.originalname);
+        cb(null, 'question-' + uniqueSuffix + ext);
+    }
+});
+
+const upload = multer({
+    storage: storage,
+    limits: { fileSize: 10 * 1024 * 1024 }, // Max 10MB
+    fileFilter: (req, file, cb) => {
+        const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+        if (allowedTypes.includes(file.mimetype)) {
+            cb(null, true);
+        } else {
+            cb(new Error('Sadece resim dosyaları (JPEG, PNG, GIF, WEBP) yüklenebilir'), false);
+        }
+    }
+});
 
 // Veritabanı ve State
 const db = require('./database/db');
@@ -283,6 +314,48 @@ app.post('/api/competition/code/:id/reset', requireAdminAuth, (req, res) => {
     } catch (error) {
         console.error('Kod sıfırlama hatası:', error);
         res.status(500).json({ error: 'Sunucu hatası' });
+    }
+});
+
+// ==================== UPLOAD API ROUTES ====================
+
+// Resim yükle
+app.post('/api/upload', requireAdminAuth, upload.single('image'), (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: 'Dosya yüklenmedi' });
+        }
+
+        const imageUrl = '/uploads/' + req.file.filename;
+        console.log('[UPLOAD] Resim yüklendi:', imageUrl);
+
+        res.json({
+            success: true,
+            url: imageUrl,
+            filename: req.file.filename
+        });
+    } catch (error) {
+        console.error('Resim yükleme hatası:', error);
+        res.status(500).json({ error: 'Resim yüklenemedi' });
+    }
+});
+
+// Resim sil
+app.delete('/api/upload/:filename', requireAdminAuth, (req, res) => {
+    try {
+        const { filename } = req.params;
+        const filePath = path.join(__dirname, 'public', 'uploads', filename);
+
+        if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+            console.log('[UPLOAD] Resim silindi:', filename);
+            res.json({ success: true });
+        } else {
+            res.status(404).json({ error: 'Dosya bulunamadı' });
+        }
+    } catch (error) {
+        console.error('Resim silme hatası:', error);
+        res.status(500).json({ error: 'Resim silinemedi' });
     }
 });
 

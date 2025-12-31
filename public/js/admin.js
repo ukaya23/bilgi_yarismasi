@@ -108,6 +108,9 @@ function setupEventListeners() {
         const optionsContainer = document.getElementById('optionsContainer');
         optionsContainer.style.display = e.target.value === 'MULTIPLE_CHOICE' ? 'block' : 'none';
     });
+
+    // Resim yükleme
+    setupImageUpload();
 }
 
 // ==================== SOCKET EVENTS ====================
@@ -394,11 +397,20 @@ function openQuestionModal(question = null) {
         title.textContent = 'Yeni Soru Ekle';
         document.getElementById('questionForm').reset();
         document.getElementById('questionId').value = '';
+        // Resim alanını sıfırla
+        clearImagePreview();
     }
 
     // Şıklar görünürlüğü
     const type = document.getElementById('questionType').value;
     document.getElementById('optionsContainer').style.display = type === 'MULTIPLE_CHOICE' ? 'block' : 'none';
+
+    // Resim önizleme (düzenleme modunda)
+    if (question && question.media_url) {
+        showImagePreview(question.media_url);
+    } else {
+        clearImagePreview();
+    }
 
     modal.classList.add('active');
 }
@@ -422,6 +434,9 @@ function saveQuestion() {
         return;
     }
 
+    // Resim URL'sini al
+    const mediaUrl = document.getElementById('questionMediaUrl').value || null;
+
     const questionData = {
         content,
         category,
@@ -429,7 +444,8 @@ function saveQuestion() {
         options,
         correct_keys: correctKeys,
         points,
-        duration
+        duration,
+        media_url: mediaUrl
     };
 
     if (id) {
@@ -718,5 +734,126 @@ function logout() {
         localStorage.removeItem('adminUsername');
         window.location.href = '/admin-login';
     });
+}
+
+// ==================== IMAGE UPLOAD ====================
+
+function setupImageUpload() {
+    const imageInput = document.getElementById('imageInput');
+    const removeBtn = document.getElementById('removeImageBtn');
+
+    if (imageInput) {
+        imageInput.addEventListener('change', handleImageSelect);
+    }
+
+    if (removeBtn) {
+        removeBtn.addEventListener('click', removeImage);
+    }
+}
+
+async function handleImageSelect(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Dosya boyutu kontrolü (10MB)
+    if (file.size > 10 * 1024 * 1024) {
+        showToast('Dosya boyutu 10MB\'dan küçük olmalıdır', 'error');
+        return;
+    }
+
+    // Dosya türü kontrolü
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+        showToast('Sadece JPEG, PNG, GIF veya WEBP dosyaları yüklenebilir', 'error');
+        return;
+    }
+
+    // Upload progress göster
+    document.getElementById('uploadProgress').classList.remove('hidden');
+    document.querySelector('.upload-placeholder').classList.add('hidden');
+
+    try {
+        const formData = new FormData();
+        formData.append('image', file);
+
+        const response = await fetch('/api/upload', {
+            method: 'POST',
+            headers: {
+                'X-Admin-Token': adminToken
+            },
+            body: formData
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            showImagePreview(data.url);
+            showToast('Resim yüklendi', 'success');
+        } else {
+            showToast(data.error || 'Yükleme hatası', 'error');
+            resetUploadArea();
+        }
+    } catch (error) {
+        console.error('Resim yükleme hatası:', error);
+        showToast('Resim yüklenemedi', 'error');
+        resetUploadArea();
+    }
+}
+
+function showImagePreview(url) {
+    const preview = document.getElementById('imagePreview');
+    const previewImg = document.getElementById('previewImage');
+    const uploadArea = document.getElementById('imageUploadArea');
+    const mediaUrlInput = document.getElementById('questionMediaUrl');
+
+    previewImg.src = url;
+    mediaUrlInput.value = url;
+    preview.classList.add('has-image');
+    uploadArea.classList.add('has-image');
+
+    // Progress'i gizle
+    document.getElementById('uploadProgress').classList.add('hidden');
+    document.querySelector('.upload-placeholder').classList.remove('hidden');
+}
+
+function clearImagePreview() {
+    const preview = document.getElementById('imagePreview');
+    const previewImg = document.getElementById('previewImage');
+    const uploadArea = document.getElementById('imageUploadArea');
+    const mediaUrlInput = document.getElementById('questionMediaUrl');
+    const imageInput = document.getElementById('imageInput');
+
+    if (previewImg) previewImg.src = '';
+    if (mediaUrlInput) mediaUrlInput.value = '';
+    if (preview) preview.classList.remove('has-image');
+    if (uploadArea) uploadArea.classList.remove('has-image');
+    if (imageInput) imageInput.value = '';
+
+    resetUploadArea();
+}
+
+function resetUploadArea() {
+    document.getElementById('uploadProgress').classList.add('hidden');
+    document.querySelector('.upload-placeholder').classList.remove('hidden');
+}
+
+async function removeImage() {
+    const mediaUrl = document.getElementById('questionMediaUrl').value;
+
+    if (mediaUrl) {
+        // Sunucudan sil
+        const filename = mediaUrl.split('/').pop();
+        try {
+            await fetch(`/api/upload/${filename}`, {
+                method: 'DELETE',
+                headers: { 'X-Admin-Token': adminToken }
+            });
+        } catch (error) {
+            console.error('Resim silme hatası:', error);
+        }
+    }
+
+    clearImagePreview();
+    showToast('Resim kaldırıldı', 'success');
 }
 

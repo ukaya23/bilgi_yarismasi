@@ -17,6 +17,11 @@ function registerPlayerHandlers(io, socket) {
     // Player odasına hemen katıl (login olmasa bile eventleri alabilsin)
     socket.join('player');
 
+    // İlk durumu gönder (PLAYER_LOGIN tetiklemesi için gerekli)
+    socket.emit('INIT_DATA', {
+        gameState: gameState.getState()
+    });
+
     // Giriş
     socket.on('PLAYER_LOGIN', (data) => {
         try {

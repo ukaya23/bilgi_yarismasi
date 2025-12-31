@@ -7,7 +7,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Production bağımlılıkları kur
-RUN npm ci --only=production
+RUN npm install --omit=dev
 
 # Uygulama dosyalarını kopyala
 COPY . .
