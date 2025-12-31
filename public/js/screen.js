@@ -19,73 +19,128 @@ const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 class CinematicManager {
     constructor() {
         this.isRevealing = false;
+        this.currentData = null;
+        this.autoSequenceTimeout = null;
     }
 
-    async playRevealSequence(data) {
-        if (this.isRevealing) return;
+    /**
+     * Reveal sürecini başlatır
+     * @param {Object} data Sonuç verileri
+     */
+    startReveal(data) {
+        this.currentData = data;
         this.isRevealing = true;
 
-        console.log('[CINEMATIC] Starting reveal sequence...');
-
-        // 1. Initial State: Hide everything, show suspense
-        showResultsScreen(data); // Populate text
+        // Initial setup
+        showResultsScreen(data);
         this.resetRevealState();
         showScreen('resultsScreen');
 
-        // Wait for suspense (3s)
+        // Mod kontrolü
+        if (data.mode === 'MANUAL') {
+            console.log('[CINEMATIC] Manual Mode Active. Waiting for steps...');
+            // Manuel modda sadece ilk adımı (suspense) veya 0. adımı bekleriz
+        } else {
+            console.log('[CINEMATIC] Auto Mode Active. Starting sequence...');
+            this.runAutoSequence();
+        }
+    }
+
+    /**
+     * Belirli bir adımı çalıştırır
+     * @param {number} step Adım numarası
+     */
+    async executeStep(step) {
+        if (!this.currentData) return;
+
+        console.log(`[CINEMATIC] Executing Step: ${step}`);
+
+        switch (step) {
+            case 1: // Reveal Image
+                if (this.currentData.question.media_url) {
+                    const mediaBox = document.getElementById('revealMediaBox');
+                    if (mediaBox) {
+                        this.revealElement('revealMediaBox');
+                    }
+                } else {
+                    console.log('[CINEMATIC] No image to reveal, skipping visual...');
+                }
+                break;
+
+            case 2: // Reveal Question
+                this.revealElement('revealQuestionBox');
+                break;
+
+            case 3: // Reveal User Answers
+                if (this.currentData.answers && this.currentData.answers.length > 0) {
+                    updateAnswersGrid(this.currentData.answers, true);
+                    this.revealElement('answersPanel');
+                    this.staggerRevealAnswers();
+                }
+                break;
+
+            case 4: // Reveal Correct Answer
+                const answerEl = document.getElementById('revealAnswer');
+                this.revealElement('revealAnswerBox');
+                setTimeout(() => {
+                    if (answerEl) answerEl.classList.add('visible');
+                }, 800);
+                break;
+
+            case 5: // Leaderboard
+                // Show Leaderboard Panel (Side-by-Side)
+                console.log('[CINEMATIC] Showing Leaderboard (Side-by-Side)');
+                const resultsLayout = document.querySelector('.results-layout');
+                if (resultsLayout) {
+                    resultsLayout.classList.remove('initial-state');
+                    // Side-by-side view active
+                }
+
+                // Wait for transition, then play animation
+                await delay(800);
+                await this.playLeaderboardSequence(this.currentData.leaderboard);
+                break;
+
+            case 6: // Full Screen Transition
+                const finalLayout = document.querySelector('.results-layout');
+                if (finalLayout) {
+                    finalLayout.classList.add('full-leaderboard');
+                }
+                this.isRevealing = false; // Bitti
+                break;
+        }
+    }
+
+    /**
+     * Otomatik akışı çalıştırır
+     */
+    async runAutoSequence() {
+        // Step 0: Initial suspence (3s)
         await delay(3000);
 
-        // 1.5 Reveal Image (if exists)
-        if (data.question.media_url) {
-            console.log('[CINEMATIC] Phase: Reveal Image');
-            const mediaBox = document.getElementById('revealMediaBox');
-            if (mediaBox) {
-                this.revealElement('revealMediaBox');
-                await delay(2000); // Resim için bekle
-            }
-        }
+        // Step 1: Image (2s wait if exists)
+        await this.executeStep(1);
+        if (this.currentData.question.media_url) await delay(2000);
 
-        // 2. Reveal Question
-        console.log('[CINEMATIC] Phase: Reveal Question');
-        this.revealElement('revealQuestionBox');
-        // Give time for presenter to read the question (approx 4s)
+        // Step 2: Question (4s wait)
+        await this.executeStep(2);
         await delay(4000);
 
-        // 3. Reveal User Answers
-        if (data.answers && data.answers.length > 0) {
-            console.log('[CINEMATIC] Phase: Reveal Answers');
-            updateAnswersGrid(data.answers, true); // Render hidden
-            this.revealElement('answersPanel');
-            this.staggerRevealAnswers();
-            // Give time to read answers (approx 6s)
-            await delay(6000);
-        }
+        // Step 3: Answers (6s wait)
+        await this.executeStep(3);
+        if (this.currentData.answers && this.currentData.answers.length > 0) await delay(6000);
 
-        // 4. Reveal Correct Answer
-        console.log('[CINEMATIC] Phase: Reveal Correct Answer');
-        const answerEl = document.getElementById('revealAnswer');
-        // Ensure wrapper is visible, then animate inner text
-        this.revealElement('revealAnswerBox');
-
-        setTimeout(() => {
-            if (answerEl) answerEl.classList.add('visible');
-        }, 800);
-
+        // Step 4: Correct Answer (5s wait)
+        await this.executeStep(4);
         await delay(5000);
 
-        // 5. Leaderboard Phase
-        console.log('[CINEMATIC] Phase: Leaderboard');
-        await this.playLeaderboardSequence(data.leaderboard);
+        // Step 5: Leaderboard
+        await this.executeStep(5);
+        // Leaderboard sequence takes time inside, usually handled by animations
 
-        // 6. Final Transition: Full Screen Leaderboard (3s after leaderboard settles)
+        // Step 6: Full Screen (3s wait after leaderboard)
         await delay(3000);
-        console.log('[CINEMATIC] Phase: Full Screen Leaderboard Transition');
-        const resultsLayout = document.querySelector('.results-layout');
-        if (resultsLayout) {
-            resultsLayout.classList.add('full-leaderboard');
-        }
-
-        this.isRevealing = false;
+        await this.executeStep(6);
     }
 
     resetRevealState() {
@@ -93,6 +148,7 @@ class CinematicManager {
         const resultsLayout = document.querySelector('.results-layout');
         if (resultsLayout) {
             resultsLayout.classList.remove('full-leaderboard');
+            resultsLayout.classList.add('initial-state'); // Hide leaderboard initially
         }
 
         // Add classes to hide elements
@@ -105,6 +161,10 @@ class CinematicManager {
                 el.classList.remove('visible');
             }
         });
+
+        // Reset answer visibility
+        const answerEl = document.getElementById('revealAnswer');
+        if (answerEl) answerEl.classList.remove('visible');
     }
 
     revealElement(id) {
@@ -125,29 +185,8 @@ class CinematicManager {
     async playLeaderboardSequence(newLeaderboard) {
         console.log('[CINEMATIC] Leaderboard sequence...');
 
-        // 5.1 Show Leaderboard Container
-        // Ensure container is cleared but layout exists
-        const container = document.getElementById('leaderboard');
-        container.innerHTML = '';
-
-        // Render CURRENT state (before updates if possible, but we only have new state)
-        // ideally we should have kept the old state. For now, we render new state but with old scores?
-        // Let's just render the new state with animations for now.
-
-        // To do a true rank change animation, we need to know the previous ranks.
-        // We have `currentLeaderboard` (global var) which *should* be the old one before we update it.
-
         const oldState = [...currentLeaderboard];
-        currentLeaderboard = newLeaderboard; // Update global state
-
-        // Render "Old" state first (for visual continuity) if possible, OR
-        // Just render new state and animate. Use FLIP if we can match IDs.
-
-        // Let's use a robust approach:
-        // 1. Render all contestants based on OLD scores/ranks.
-        // 2. Wait.
-        // 3. Update scores (animate numbers).
-        // 4. Sort and move to new positions.
+        currentLeaderboard = newLeaderboard;
 
         await this.renderLeaderboardFLIP(oldState, newLeaderboard);
     }
@@ -155,32 +194,23 @@ class CinematicManager {
     async renderLeaderboardFLIP(oldData, newData) {
         const container = document.getElementById('leaderboard');
 
-        // Map for easy lookup
-        const newMap = new Map(newData.map(p => [p.id, p]));
-
-        // 1. Render Initial State (Old Data)
-        // If oldData is empty (first run), just use newData start
+        // 1. Initial Render (Old Positions)
         const startData = oldData.length > 0 ? oldData : newData;
-
         container.innerHTML = '';
-        const cardMap = new Map(); // id -> element
+        const cardMap = new Map();
 
-        // Create elements for EVERYONE in the new data (even if they weren't in old)
         newData.forEach((p, i) => {
             const oldP = startData.find(o => o.id === p.id) || { ...p, total_score: 0, rank: 999 };
-            // Calculate old rank
             const oldRankIdx = startData.findIndex(o => o.id === p.id);
-            const initialTop = (oldRankIdx !== -1 ? oldRankIdx : i) * 80; // height + gap
+            const initialTop = (oldRankIdx !== -1 ? oldRankIdx : i) * 80;
 
             const card = this.createLeaderboardCard(p, oldP.total_score, oldRankIdx !== -1 ? oldRankIdx : i);
-            // Force absolute position
             card.style.top = `${initialTop}px`;
 
             container.appendChild(card);
             cardMap.set(p.id, card);
         });
 
-        // Wait to see old state
         await delay(1000);
 
         // 2. Animate Scores
@@ -200,18 +230,15 @@ class CinematicManager {
         // 3. Reorder (FLIP)
         newData.forEach((p, newIndex) => {
             const card = cardMap.get(p.id);
-            const newTop = newIndex * 80; // Height + gap
+            const newTop = newIndex * 80;
 
-            // Apply new position
             card.style.top = `${newTop}px`;
 
-            // Update styling for top 3
             card.classList.remove('top-1', 'top-2', 'top-3');
             if (newIndex === 0) card.classList.add('top-1');
             if (newIndex === 1) card.classList.add('top-2');
             if (newIndex === 2) card.classList.add('top-3');
 
-            // Update rank icon
             const rankEmoji = newIndex === 0 ? '🥇' : newIndex === 1 ? '🥈' : newIndex === 2 ? '🥉' : `${newIndex + 1}`;
             card.querySelector('.entry-rank').textContent = rankEmoji;
         });
@@ -246,9 +273,7 @@ class CinematicManager {
             let progress = timePassed / duration;
             if (progress > 1) progress = 1;
 
-            // Ease out
             const ease = 1 - Math.pow(1 - progress, 3);
-
             const current = Math.floor(start + (range * ease));
             el.textContent = current;
 
@@ -348,7 +373,11 @@ function setupSocketEvents() {
             soundManager.playResults();
         }
         // Trigger Cinematic Reveal
-        cinematicManager.playRevealSequence(data);
+        cinematicManager.startReveal(data);
+    });
+
+    socketManager.on('SCREEN_STEP_UPDATE', (data) => {
+        cinematicManager.executeStep(data.step);
     });
 
     socketManager.on('NEW_QUOTE', (data) => {

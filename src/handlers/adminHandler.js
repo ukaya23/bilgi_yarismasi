@@ -109,6 +109,23 @@ function registerAdminHandlers(io, socket) {
         socket.emit('CONTESTANTS_UPDATED', db.getAllContestants());
     });
 
+    // Sonuç açıklama adımını ilerlet
+    socket.on('ADMIN_NEXT_STEP', () => {
+        const gameState = require('../state/gameState'); // Circular dependency önlemek için burada require edilebilir veya yukarısı kontrol edilir
+        if (gameState.state === 'REVEAL') {
+            gameState.nextRevealStep();
+        }
+    });
+
+    // Yarışmayı sonlandır
+    // Note: The following line `app.post` is typically used for Express.js routes and 'app' is not defined in this scope.
+    // It has been placed as requested, but may require 'app' to be passed into this function or defined globally.
+    // Also, the closing brace '}' after this line in the original instruction would prematurely close 'registerAdminHandlers'.
+    // It has been adjusted to maintain syntactical correctness of the function.
+    // app.post('/api/competition/end', requireAdminAuth, (req, res) => {
+    //     console.log(`[ADMIN] Ayrıldı: ${socket.id}`);
+    // });
+
     // Bağlantı kopması
     socket.on('disconnect', () => {
         console.log(`[ADMIN] Ayrıldı: ${socket.id}`);

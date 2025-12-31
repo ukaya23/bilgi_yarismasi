@@ -54,11 +54,6 @@
             <section id="dashboard-section" class="section active">
                 <header class="section-header">
                     <h1>Yarışma Kontrol Paneli</h1>
-                    <div class="header-actions">
-                        <button class="btn btn-danger" id="resetGameBtn">
-                            🔄 Yarışmayı Sıfırla
-                        </button>
-                    </div>
                 </header>
 
                 <!-- Game Status -->
@@ -93,6 +88,16 @@
                                 <option value="">Soru Seçin...</option>
                             </select>
                         </div>
+                        <div class="form-group hidden" id="stepControlGroup">
+                            <label class="form-label">
+                                Ekran Adımı: <span id="currentStepName" class="badge badge-info">-</span>
+                            </label>
+                            <button class="btn btn-primary pulse w-100" id="nextStepBtn">
+                                <span class="btn-icon">➡️</span>
+                                Sonraki Adım
+                            </button>
+                        </div>
+
                         <div class="action-buttons">
                             <button class="btn btn-success btn-lg" id="startQuestionBtn" disabled>
                                 ▶️ Soruyu Başlat
@@ -105,6 +110,10 @@
                             </button>
                             <button class="btn btn-secondary btn-lg" id="goIdleBtn" disabled>
                                 ⏸️ Beklemeye Al
+                            </button>
+                            <button class="btn btn-warning btn-lg" id="resetGameBtn">
+                                <span class="btn-icon">🔄</span>
+                                Oyunu Sıfırla
                             </button>
                         </div>
                     </div>
@@ -228,7 +237,7 @@
                 </header>
 
                 <div class="card">
-                    <h3>⏱️ Zamanlama Ayarları</h3>
+                    <h3>⚙️ Genel Ayarlar</h3>
                     <div id="settingsForm">
                         <p class="text-muted">Yükleniyor...</p>
                     </div>
@@ -368,7 +377,7 @@
 
     <script src="/js/socket.io.min.js"></script>
     <script src="/js/common.js"></script>
-    <script src="/js/admin.js"></script>
+    <script src="/js/admin.js?v=2"></script>
 </body>
 
 </html>

@@ -674,7 +674,8 @@ function runMigrations() {
         ['question_warning_time', '10', 'Süre uyarısı başlangıcı (saniye kala)'],
         ['result_display_duration', '15', 'Sonuç ekranı gösterim süresi (saniye)'],
         ['sound_enabled', '1', 'Ses efektleri açık/kapalı'],
-        ['tick_sound_start', '10', 'Tik sesi başlangıcı (saniye kala)']
+        ['tick_sound_start', '10', 'Tik sesi başlangıcı (saniye kala)'],
+        ['screen_control_mode', 'AUTO', 'Ekran akış kontrolü (AUTO/MANUAL)']
     ];
 
     for (const [key, value, desc] of defaultSettings) {

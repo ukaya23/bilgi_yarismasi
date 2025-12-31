@@ -368,6 +368,19 @@ body {
 .leaderboard-panel {
     flex: 1;
     transition: all 1s cubic-bezier(0.4, 0, 0.2, 1);
+    opacity: 1;
+    transform: translateX(0);
+}
+
+/* Initial State: Leaderboard Hidden */
+/* Initial State: Leaderboard COMPLETELY Hidden */
+.results-layout.initial-state .leaderboard-panel {
+    display: none !important;
+}
+
+.results-layout.initial-state .results-main {
+    flex: 1;
+    max-width: 100%;
 }
 
 /* Full Screen Leaderboard Mode */

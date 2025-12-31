@@ -95,7 +95,9 @@ function setupEventListeners() {
     document.getElementById('skipToGradingBtn').addEventListener('click', skipToGrading);
     document.getElementById('showResultsBtn').addEventListener('click', showResults);
     document.getElementById('goIdleBtn').addEventListener('click', goIdle);
+    document.getElementById('goIdleBtn').addEventListener('click', goIdle);
     document.getElementById('resetGameBtn').addEventListener('click', resetGame);
+    document.getElementById('nextStepBtn').addEventListener('click', nextStep);
 
     // Soru modal
     document.getElementById('addQuestionBtn').addEventListener('click', () => openQuestionModal());
@@ -162,6 +164,26 @@ function setupSocketEvents() {
     // Sonuçlar
     socketManager.on('SHOW_RESULTS', (data) => {
         updateLeaderboard(data.leaderboard);
+        updateButtonStates(); // Mod kontrolü için tetikle
+    });
+
+    // Manuel Akış Durumu
+    socketManager.on('ADMIN_REVEAL_STATE', (data) => {
+        const stepNameEl = document.getElementById('currentStepName');
+        const nextBtn = document.getElementById('nextStepBtn');
+        const idleBtn = document.getElementById('goIdleBtn');
+
+        if (stepNameEl) stepNameEl.textContent = `${data.step}. ${data.stepName}`;
+
+        if (data.isFinished) {
+            nextBtn.disabled = true;
+            nextBtn.innerHTML = '<span class="btn-icon">✅</span> Tamamlandı';
+            idleBtn.disabled = false;
+        } else {
+            nextBtn.disabled = false;
+            nextBtn.innerHTML = '<span class="btn-icon">➡️</span> Sonraki Adım';
+            idleBtn.disabled = true;
+        }
     });
 
     // İşlem sonucu
@@ -230,33 +252,46 @@ function updateButtonStates() {
     const idleBtn = document.getElementById('goIdleBtn');
     const selectEl = document.getElementById('questionSelect');
 
-    switch (currentGameState) {
-        case 'IDLE':
+    // Mod değişikliği kontrolü
+    const stepControlGroup = document.getElementById('stepControlGroup');
+    const nextStepBtn = document.getElementById('nextStepBtn');
+
+    if (currentGameState === 'REVEAL') {
+        startBtn.disabled = true;
+        skipBtn.disabled = true;
+        showBtn.disabled = true;
+
+        // Eğer manual mod aktifse ve reveal devam ediyorsa
+        if (appSettings.screen_control_mode === 'MANUAL') {
+            stepControlGroup.classList.remove('hidden');
+            idleBtn.disabled = true; // Bitmeden çıkılmasın (tercihen)
+        } else {
+            stepControlGroup.classList.add('hidden');
+            idleBtn.disabled = false;
+        }
+    } else {
+        stepControlGroup.classList.add('hidden');
+        if (currentGameState === 'IDLE') {
             startBtn.disabled = !selectEl.value;
             skipBtn.disabled = true;
             showBtn.disabled = true;
             idleBtn.disabled = true;
-            break;
-        case 'QUESTION_ACTIVE':
+        } else if (currentGameState === 'QUESTION_ACTIVE') {
             startBtn.disabled = true;
             skipBtn.disabled = false;
             showBtn.disabled = true;
             idleBtn.disabled = true;
-            break;
-        case 'LOCKED':
-        case 'GRADING':
+        } else if (currentGameState === 'LOCKED' || currentGameState === 'GRADING') {
             startBtn.disabled = true;
             skipBtn.disabled = true;
             showBtn.disabled = false;
             idleBtn.disabled = true;
-            break;
-        case 'REVEAL':
-            startBtn.disabled = true;
-            skipBtn.disabled = true;
-            showBtn.disabled = true;
-            idleBtn.disabled = false;
-            break;
+        }
     }
+}
+
+function nextStep() {
+    socketManager.emit('ADMIN_NEXT_STEP');
 }
 
 function updateQuestionsUI() {
@@ -695,6 +730,24 @@ function renderSettings() {
     if (!container) return;
 
     container.innerHTML = `
+
+        <div class="form-group">
+            <label class="form-label">Ekran Akış Kontrolü</label>
+            <div class="radio-group">
+                <label class="radio-label">
+                    <input type="radio" name="screen_control_mode" value="AUTO" 
+                        ${(!appSettings.screen_control_mode || appSettings.screen_control_mode === 'AUTO') ? 'checked' : ''}>
+                    <span class="radio-text">Otomatik (Süreli)</span>
+                </label>
+                <label class="radio-label">
+                    <input type="radio" name="screen_control_mode" value="MANUAL"
+                        ${appSettings.screen_control_mode === 'MANUAL' ? 'checked' : ''}>
+                    <span class="radio-text">Manuel (Butonla)</span>
+                </label>
+            </div>
+            <small class="form-hint">Sonuç ekranında adımların (Resim, Soru, Cevap, Sıralama) nasıl ilerleyeceğini belirler.</small>
+        </div>
+
         <div class="form-group">
             <label class="form-label">Bekleme Ekranı Alıntı Süresi (saniye)</label>
             <input type="number" class="form-control" id="setting_idle_quote_interval" 
@@ -720,11 +773,11 @@ function renderSettings() {
         </div>
         
         <div class="form-group">
-            <label class="form-label">
-                <input type="checkbox" id="setting_sound_enabled" 
-                       ${appSettings.sound_enabled === '1' ? 'checked' : ''}>
-                Ses Efektleri Açık
-            </label>
+            <label class="form-label">Ses Efektleri</label>
+            <select class="form-control" id="setting_sound_enabled">
+                <option value="1" ${appSettings.sound_enabled === '1' ? 'selected' : ''}>Açık</option>
+                <option value="0" ${appSettings.sound_enabled === '0' ? 'selected' : ''}>Kapalı</option>
+            </select>
         </div>
         
         <button class="btn btn-primary" onclick="saveSettings()">💾 Ayarları Kaydet</button>
@@ -737,7 +790,8 @@ async function saveSettings() {
         question_warning_time: document.getElementById('setting_question_warning_time').value,
         result_display_duration: document.getElementById('setting_result_display_duration').value,
         tick_sound_start: document.getElementById('setting_tick_sound_start').value,
-        sound_enabled: document.getElementById('setting_sound_enabled').checked ? '1' : '0'
+        sound_enabled: document.getElementById('setting_sound_enabled').value, // Select olduğu için .value
+        screen_control_mode: document.querySelector('input[name="screen_control_mode"]:checked').value
     };
 
     try {
@@ -881,7 +935,7 @@ async function removeImage() {
         // Sunucudan sil
         const filename = mediaUrl.split('/').pop();
         try {
-            await fetch(`/api/upload/${filename}`, {
+            await fetch(`/ api / upload / ${filename} `, {
                 method: 'DELETE',
                 headers: { 'X-Admin-Token': adminToken }
             });

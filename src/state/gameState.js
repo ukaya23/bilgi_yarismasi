@@ -18,8 +18,13 @@ class GameState {
         this.questionStartTime = null;
         this.timer = null;
         this.timeRemaining = 0;
+        this.questions = [];
         this.answeredPlayers = new Set();
+        this.currentRevealStep = 0; // Reveal adımı
         this.io = null;
+
+        // Singleton instance'ı sakla
+        GameState.instance = this;
     }
 
     /**
@@ -383,22 +388,69 @@ class GameState {
      */
     showResults() {
         this.setState('REVEAL');
+        this.currentRevealStep = 0; // Adım sayacını sıfırla
 
         if (!this.currentQuestion || !this.io) return;
 
         const answers = db.getAnswersForQuestion(this.currentQuestion.id);
         const leaderboard = db.getLeaderboard();
+        const controlMode = db.getSetting('screen_control_mode') || 'AUTO';
 
-        // Tüm ekranlara sonuçları gönder
+        // Tüm ekranlara sonuçları gönder (Başlangıç verisi)
         this.io.emit('SHOW_RESULTS', {
             question: {
                 content: this.currentQuestion.content,
                 correctAnswer: this.currentQuestion.correct_keys[0] || '',
                 points: this.currentQuestion.points,
-                media_url: this.currentQuestion.media_url // Resim URL'ini ekle
+                media_url: this.currentQuestion.media_url
             },
             answers: answers,
-            leaderboard: leaderboard
+            leaderboard: leaderboard,
+            mode: controlMode // Mod bilgisini de gönder
+        });
+
+        // Eğer mod MANUAL ise, admin'e de güncel adımı bildir
+        if (controlMode === 'MANUAL') {
+            this.notifyAdminStepUpdate(0);
+        }
+    }
+
+    /**
+     * Manuel modda bir sonraki adıma geç
+     */
+    nextRevealStep() {
+        if (this.state !== 'REVEAL') return;
+
+        this.currentRevealStep++;
+
+        // Ekrana bildir
+        this.io.to('screen').emit('SCREEN_STEP_UPDATE', {
+            step: this.currentRevealStep
+        });
+
+        // Admin'e bildir
+        this.notifyAdminStepUpdate(this.currentRevealStep);
+    }
+
+    notifyAdminStepUpdate(step) {
+        const steps = [
+            'Başlangıç',
+            'Resim Gösterimi',
+            'Soru Gösterimi',
+            'Cevaplar',
+            'Doğru Cevap',
+            'Sıralama',
+            'Tam Ekran Sıralama',
+            'Tamamlandı'
+        ];
+
+        const stepName = steps[step] || 'Bilinmiyor';
+        const isFinished = step >= 6; // 6. adım son adım
+
+        this.io.to('admin').emit('ADMIN_REVEAL_STATE', {
+            step: step,
+            stepName: stepName,
+            isFinished: isFinished
         });
     }
 
