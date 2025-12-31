@@ -626,3 +626,28 @@ body {
 .hidden {
     display: none !important;
 }
+
+/* Screen Media Styles */
+.screen-media,
+.reveal-media {
+    width: 100%;
+    margin-bottom: 2rem;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.screen-media img,
+.reveal-media img {
+    max-height: 50vh;
+    max-width: 100%;
+    object-fit: contain;
+    border-radius: 20px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    border: 3px solid rgba(255, 255, 255, 0.1);
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.reveal-media img {
+    max-height: 300px;
+}

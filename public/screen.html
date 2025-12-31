@@ -60,9 +60,13 @@
                 </div>
             </div>
 
-            <!-- Center: Quote -->
+            <!-- Center: Quote or Media -->
             <div class="center-panel">
-                <div class="quote-container">
+                <div class="screen-media hidden" id="screenMedia">
+                    <img src="" alt="Soru Görseli" id="screenQuestionImage">
+                </div>
+
+                <div class="quote-container" id="quoteContainer">
                     <div class="quote-icon">💭</div>
                     <blockquote class="quote-text" id="quoteText">
                         "Bilgi güçtür."
@@ -104,8 +108,16 @@
     <div class="screen-state hidden" id="resultsScreen">
         <div class="results-layout">
             <!-- Left Column: Reveal & Answers -->
+            <!-- Left Column: Reveal & Answers -->
             <div class="results-main">
                 <div class="reveal-panel">
+                    <!-- Media Reveal (New) -->
+                    <div class="question-reveal animate-slide-down" id="revealMediaBox">
+                        <div class="reveal-media hidden" id="revealMedia">
+                            <img src="" alt="Soru Görseli" id="revealImage">
+                        </div>
+                    </div>
+
                     <div class="question-reveal animate-slide-down" id="revealQuestionBox">
                         <div class="reveal-label">SORU</div>
                         <div class="reveal-question" id="revealQuestion">
@@ -148,7 +160,7 @@
     <script src="/js/socket.io.min.js"></script>
     <script src="/js/common.js"></script>
     <script src="/js/sounds.js"></script>
-    <script src="/js/screen.js"></script>
+    <script src="/js/screen.js?v=3"></script>
 </body>
 
 </html>

@@ -32,8 +32,18 @@ class CinematicManager {
         this.resetRevealState();
         showScreen('resultsScreen');
 
-        // Wait for suspense (3s) - User said "bir kaç saniye beklesin"
+        // Wait for suspense (3s)
         await delay(3000);
+
+        // 1.5 Reveal Image (if exists)
+        if (data.question.media_url) {
+            console.log('[CINEMATIC] Phase: Reveal Image');
+            const mediaBox = document.getElementById('revealMediaBox');
+            if (mediaBox) {
+                this.revealElement('revealMediaBox');
+                await delay(2000); // Resim için bekle
+            }
+        }
 
         // 2. Reveal Question
         console.log('[CINEMATIC] Phase: Reveal Question');
@@ -86,14 +96,15 @@ class CinematicManager {
         }
 
         // Add classes to hide elements
-        document.getElementById('revealQuestionBox').classList.add('reveal-step');
-        document.getElementById('revealQuestionBox').classList.remove('visible');
+        const elementsToHide = ['revealMediaBox', 'revealQuestionBox', 'revealAnswerBox', 'answersPanel'];
 
-        document.getElementById('revealAnswerBox').classList.add('reveal-step');
-        document.getElementById('revealAnswerBox').classList.remove('visible');
-
-        document.getElementById('answersPanel').classList.add('reveal-step');
-        document.getElementById('answersPanel').classList.remove('visible');
+        elementsToHide.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.classList.add('reveal-step');
+                el.classList.remove('visible');
+            }
+        });
     }
 
     revealElement(id) {
@@ -122,10 +133,6 @@ class CinematicManager {
         // Render CURRENT state (before updates if possible, but we only have new state)
         // ideally we should have kept the old state. For now, we render new state but with old scores?
         // Let's just render the new state with animations for now.
-
-        // Render items at their FINAL positions but maybe calculate "previous" positions?
-        // Simpler approach: FLIP animation from currentDOM to newDOM? 
-        // Since we re-render, let's just animate entry.
 
         // To do a true rank change animation, we need to know the previous ranks.
         // We have `currentLeaderboard` (global var) which *should* be the old one before we update it.
@@ -428,11 +435,36 @@ function showQuestionScreen(data) {
     document.getElementById('categoryValue').textContent = data.category || 'Genel Kültür';
     document.getElementById('pointsValue').textContent = data.points;
     if (data.index) updateQuestionCounter(data.index, data.total);
-    if (data.quote) showQuote(data.quote);
+
+    // Resim vs Quote
+    const mediaContainer = document.getElementById('screenMedia');
+    const quoteContainer = document.getElementById('quoteContainer');
+    const imageEl = document.getElementById('screenQuestionImage');
+
+    if (data.media_url) {
+        imageEl.src = data.media_url;
+        mediaContainer.classList.remove('hidden');
+        mediaContainer.style.display = 'flex';
+        if (quoteContainer) quoteContainer.classList.add('hidden');
+    } else {
+        mediaContainer.classList.add('hidden');
+        mediaContainer.style.display = 'none';
+        if (quoteContainer) {
+            quoteContainer.classList.remove('hidden');
+            if (data.quote) showQuote(data.quote);
+        }
+    }
+
     updateContestantsGrid();
 }
 
 function showQuote(quote) {
+    const quoteContainer = document.getElementById('quoteContainer');
+    // Eğer resim görünüyorsa, quote güncellemelerini yoksay (veya arka planda yap ama gösterme)
+    if (document.getElementById('screenMedia').classList.contains('hidden')) {
+        quoteContainer.classList.remove('hidden');
+    }
+
     document.getElementById('quoteText').textContent = `"${quote.text}"`;
     document.getElementById('quoteAuthor').textContent = `— ${quote.author}`;
 }
@@ -468,6 +500,22 @@ function showResultsScreen(data) {
     // Populate Data (Hidden)
     document.getElementById('revealQuestion').textContent = data.question.content;
     document.getElementById('revealAnswer').textContent = data.question.correctAnswer;
+
+    // Resim Gösterimi (Sonuç Ekranı)
+    const revealMedia = document.getElementById('revealMedia');
+    const revealImage = document.getElementById('revealImage');
+    const revealMediaBox = document.getElementById('revealMediaBox');
+
+    if (data.question.media_url) {
+        revealImage.src = data.question.media_url;
+        revealMedia.classList.remove('hidden');
+        revealMedia.style.display = 'flex'; // Zorla göster
+        if (revealMediaBox) revealMediaBox.style.display = 'block'; // Container'ı göster (block veya flex)
+    } else {
+        revealMedia.classList.add('hidden');
+        revealMedia.style.display = 'none';
+        if (revealMediaBox) revealMediaBox.style.display = 'none';
+    }
 }
 
 function updateAnswersGrid(answers, hidden = false) {

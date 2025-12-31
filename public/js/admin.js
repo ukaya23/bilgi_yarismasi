@@ -177,8 +177,23 @@ function setupSocketEvents() {
     socketManager.on('GAME_RESET', () => {
         console.log('[ADMIN] Game reset received');
         contestants = [];
+        questions = []; // Sorular veritabanından tekrar yüklenecek ama şimdilik boşalt
+
         updateContestantsUI();
-        updateLeaderboard([]); // Açıkça boş dizi ile güncelle
+        updateLeaderboard([]);
+
+        // Ekstra UI temizliği
+        document.getElementById('answeredCount').textContent = '0/0';
+        document.getElementById('currentQuestion').textContent = '-';
+        document.getElementById('gameState').textContent = 'IDLE';
+        document.getElementById('gameState').className = 'status-value state-idle';
+        currentGameState = 'IDLE';
+        updateButtonStates();
+
+        showToast('Yarışma sıfırlandı', 'success');
+
+        // Verileri tekrar yükle (sorular vs.)
+        socketManager.emit('ADMIN_REFRESH_CONTESTANTS');
     });
 }
 
@@ -616,12 +631,34 @@ async function resetCode(codeId) {
     }
 }
 
-function endCompetition() {
-    if (confirm('Yarışmayı sonlandırmak istediğinize emin misiniz?')) {
-        // API çağrısı yapılabilir, şimdilik sadece UI güncelle
-        activeCompetition = null;
-        competitionCodes = [];
-        renderNoCompetition();
+async function endCompetition() {
+    if (!confirm('Yarışmayı sonlandırmak istediğinize emin misiniz?')) return;
+
+    try {
+        const response = await fetch('/api/competition/end', {
+            method: 'POST',
+            headers: { 'X-Admin-Token': adminToken }
+        });
+
+        const data = await response.json();
+
+        if (data.success || response.ok) {
+            activeCompetition = null;
+            competitionCodes = [];
+            renderNoCompetition();
+
+            // UI'ı temizle
+            document.getElementById('answeredCount').textContent = '0/0';
+            document.getElementById('currentQuestion').textContent = '-';
+            updateButtonStates();
+
+            showToast('Yarışma sonlandırıldı', 'success');
+        } else {
+            showToast('Yarışma sonlandırılamadı', 'error');
+        }
+    } catch (error) {
+        console.error('Yarışma sonlandırma hatası:', error);
+        showToast('Sunucu hatası', 'error');
     }
 }
 

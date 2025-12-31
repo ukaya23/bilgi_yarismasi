@@ -265,6 +265,22 @@ app.post('/api/competition', requireAdminAuth, (req, res) => {
     }
 });
 
+// Yarışmayı sonlandır
+app.post('/api/competition/end', requireAdminAuth, (req, res) => {
+    try {
+        const activeCompetition = db.getActiveCompetition();
+        if (activeCompetition) {
+            db.updateCompetitionStatus(activeCompetition.id, 'COMPLETED');
+            gameState.resetGame(); // Oyunu da resetle
+            console.log('[COMPETITION] Yarışma sonlandırıldı:', activeCompetition.id);
+        }
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Yarışma sonlandırma hatası:', error);
+        res.status(500).json({ error: 'Sunucu hatası' });
+    }
+});
+
 // Aktif yarışmayı getir
 app.get('/api/competition/active', (req, res) => {
     try {

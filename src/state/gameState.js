@@ -121,7 +121,8 @@ class GameState {
                 duration: this.currentQuestion.duration,
                 quote: quote,
                 index: questionIndex,
-                total: totalQuestions
+                total: totalQuestions,
+                media_url: this.currentQuestion.media_url // Resim URL'ini ekle
             });
         }
 
@@ -393,7 +394,8 @@ class GameState {
             question: {
                 content: this.currentQuestion.content,
                 correctAnswer: this.currentQuestion.correct_keys[0] || '',
-                points: this.currentQuestion.points
+                points: this.currentQuestion.points,
+                media_url: this.currentQuestion.media_url // Resim URL'ini ekle
             },
             answers: answers,
             leaderboard: leaderboard

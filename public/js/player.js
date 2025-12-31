@@ -320,8 +320,24 @@ function showQuestion(question) {
 
     // Medya
     const mediaContainer = document.getElementById('questionMedia');
+    console.log('[DEBUG] Soru görseli:', question.media_url);
+
     if (question.media_url) {
-        document.getElementById('questionImage').src = question.media_url;
+        const img = document.getElementById('questionImage');
+        img.src = question.media_url;
+
+        // Resim yüklendiğinde göster
+        img.onload = () => {
+            console.log('[DEBUG] Resim yüklendi');
+            mediaContainer.classList.remove('hidden');
+        };
+        img.onerror = () => {
+            console.error('[ERROR] Resim yüklenemedi:', question.media_url);
+            mediaContainer.classList.add('hidden');
+        };
+
+        // Hızlıca göstermek için onload beklemeden de class'ı kaldırabiliriz ama
+        // onload daha güvenli. Yine de URL varsa kaldıralım:
         mediaContainer.classList.remove('hidden');
     } else {
         mediaContainer.classList.add('hidden');
