@@ -10,6 +10,22 @@
 </head>
 
 <body class="screen-body">
+    <!-- Header Info Bar -->
+    <div class="header-bar">
+        <div class="header-left">
+            <div class="logo-small">🎯</div>
+            <div class="contest-title">BİLGİ YARIŞMASI</div>
+        </div>
+        <div class="header-right">
+            <div class="question-counter" id="questionCounter">
+                <span class="q-label">SORU</span>
+                <span class="q-current" id="currentQuestionIdx">-</span>
+                <span class="q-sep">/</span>
+                <span class="q-total" id="totalQuestions">-</span>
+            </div>
+        </div>
+    </div>
+
     <!-- Idle Screen (Logo & Waiting) -->
     <div class="screen-state" id="idleScreen">
         <div class="idle-content">
@@ -87,19 +103,29 @@
     <!-- Results Screen -->
     <div class="screen-state hidden" id="resultsScreen">
         <div class="results-layout">
-            <!-- Question & Answer Reveal -->
-            <div class="reveal-panel">
-                <div class="question-reveal animate-slide-down">
-                    <div class="reveal-label">SORU</div>
-                    <div class="reveal-question" id="revealQuestion">
-                        Soru metni burada görünecek...
+            <!-- Left Column: Reveal & Answers -->
+            <div class="results-main">
+                <div class="reveal-panel">
+                    <div class="question-reveal animate-slide-down" id="revealQuestionBox">
+                        <div class="reveal-label">SORU</div>
+                        <div class="reveal-question" id="revealQuestion">
+                            Soru metni burada görünecek...
+                        </div>
+                    </div>
+
+                    <div class="answer-reveal animate-slide-up" id="revealAnswerBox">
+                        <div class="reveal-label">DOĞRU CEVAP</div>
+                        <div class="reveal-answer" id="revealAnswer">
+                            Cevap
+                        </div>
                     </div>
                 </div>
 
-                <div class="answer-reveal animate-slide-up">
-                    <div class="reveal-label">DOĞRU CEVAP</div>
-                    <div class="reveal-answer" id="revealAnswer">
-                        Cevap
+                <!-- Answers Grid -->
+                <div class="answers-panel" id="answersPanel">
+                    <h3 class="panel-title">Verilen Cevaplar</h3>
+                    <div class="answers-grid" id="answersGrid">
+                        <!-- Answers will be populated here -->
                     </div>
                 </div>
             </div>

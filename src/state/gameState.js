@@ -69,10 +69,17 @@ class GameState {
             clearInterval(this.timer);
         }
 
+        // Sorunun sırasını ve toplam soru sayısını bul
+        const allQuestions = db.getAllQuestions();
+        const questionIndex = allQuestions.findIndex(q => q.id === question.id) + 1;
+        const totalQuestions = allQuestions.length;
+
         this.currentQuestion = {
             ...question,
             options: question.options ? JSON.parse(question.options) : null,
-            correct_keys: question.correct_keys ? JSON.parse(question.correct_keys) : []
+            correct_keys: question.correct_keys ? JSON.parse(question.correct_keys) : [],
+            index: questionIndex,
+            total: totalQuestions
         };
         this.questionStartTime = Date.now();
         this.timeRemaining = question.duration;
@@ -89,7 +96,9 @@ class GameState {
                 options: this.currentQuestion.options,
                 points: this.currentQuestion.points,
                 duration: this.currentQuestion.duration,
-                media_url: this.currentQuestion.media_url
+                media_url: this.currentQuestion.media_url,
+                index: questionIndex,
+                total: totalQuestions
             });
 
             this.io.to('jury').emit('NEW_QUESTION', {
@@ -99,7 +108,9 @@ class GameState {
                 options: this.currentQuestion.options,
                 correct_keys: this.currentQuestion.correct_keys,
                 points: this.currentQuestion.points,
-                duration: this.currentQuestion.duration
+                duration: this.currentQuestion.duration,
+                index: questionIndex,
+                total: totalQuestions
             });
 
             // Seyirciye maskelenmiş soru gönder
@@ -108,7 +119,9 @@ class GameState {
                 category: this.currentQuestion.category || 'Genel Kültür',
                 points: this.currentQuestion.points,
                 duration: this.currentQuestion.duration,
-                quote: quote
+                quote: quote,
+                index: questionIndex,
+                total: totalQuestions
             });
         }
 
@@ -164,10 +177,33 @@ class GameState {
     autoGradeMultipleChoice() {
         if (!this.currentQuestion) return;
 
+        // 1. Önce cevap vermeyenler için boş cevap oluştur
+        const existingAnswers = db.getAnswersForQuestion(this.currentQuestion.id);
+        const allContestants = db.getAllContestants();
+        const answeredContestantIds = new Set(existingAnswers.map(a => a.contestant_id));
+
+        for (const contestant of allContestants) {
+            if (!answeredContestantIds.has(contestant.id) && contestant.status !== 'OFFLINE') {
+                db.saveAnswer(
+                    this.currentQuestion.id,
+                    contestant.id,
+                    '', // Boş cevap
+                    0   // Süre bitti
+                );
+            }
+        }
+
+        // 2. Güncel cevap listesini al ve puanla
         const answers = db.getAnswersForQuestion(this.currentQuestion.id);
         const correctKeys = this.currentQuestion.correct_keys;
 
         for (const answer of answers) {
+            // Boş cevaplar zaten yanlış sayılacak
+            if (!answer.answer_text) {
+                db.gradeAnswer(answer.id, false, 0);
+                continue;
+            }
+
             const isCorrect = correctKeys.includes(answer.answer_text);
             const points = isCorrect ? this.currentQuestion.points : 0;
             db.gradeAnswer(answer.id, isCorrect, points);
