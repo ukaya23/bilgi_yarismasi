@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Screen Test - 16:9 Projeksiyon</title>
+    <link rel="stylesheet" href="/css/common.css">
+    <link rel="stylesheet" href="/css/screen.css">
+    <style>
+        /* Test Controls */
+        .test-controls {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 10px;
+            z-index: 1000;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .test-controls button {
+            display: block;
+            width: 100%;
+            margin: 5px 0;
+            padding: 8px;
+            cursor: pointer;
+            background: #8b5cf6;
+            color: white;
+            border: none;
+            border-radius: 5px;
+        }
+        .test-controls button:hover {
+            background: #7c3aed;
+        }
+        .test-controls .info {
+            color: #10b981;
+            margin: 5px 0;
+        }
+    </style>
+</head>
+
+<body class="screen-body">
+    <!-- Test Controls -->
+    <div class="test-controls">
+        <h3 style="color: white; margin: 0 0 10px 0;">🎬 Screen Test</h3>
+        <div class="info">Ekran: <span id="resolution"></span></div>
+        <div class="info">Oran: <span id="aspectRatio"></span></div>
+        <button onclick="showState('idleScreen')">1. IDLE Ekranı</button>
+        <button onclick="showState('questionScreen')">2. Soru Ekranı</button>
+        <button onclick="showState('gradingScreen')">3. Değerlendirme</button>
+        <button onclick="showState('resultsScreen')">4. Sonuç Ekranı</button>
+        <button onclick="toggleFullscreen()">⛶ Tam Ekran</button>
+        <button onclick="location.reload()">🔄 Yenile</button>
+    </div>
+
+    <!-- Header Info Bar -->
+    <div class="header-bar">
+        <div class="header-left">
+            <div class="logo-small">🎯</div>
+            <div class="contest-title">BİLGİ YARIŞMASI</div>
+        </div>
+        <div class="header-right">
+            <div class="question-counter" id="questionCounter">
+                <span class="q-label">SORU</span>
+                <span class="q-current">3</span>
+                <span class="q-sep">/</span>
+                <span class="q-total">10</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 1. Idle Screen -->
+    <div class="screen-state" id="idleScreen">
+        <div class="idle-content">
+            <div class="logo-large animate-pulse">🎯</div>
+            <h1 class="title-large">Bilgi Yarışması</h1>
+            <p class="subtitle">Yarışma başlamak üzere...</p>
+
+            <div class="contestants-preview">
+                <div class="preview-badge online">
+                    <span class="status-dot status-online"></span>
+                    <span>Masa 1: Ahmet Yılmaz</span>
+                </div>
+                <div class="preview-badge online">
+                    <span class="status-dot status-online"></span>
+                    <span>Masa 2: Ayşe Demir</span>
+                </div>
+                <div class="preview-badge online">
+                    <span class="status-dot status-online"></span>
+                    <span>Masa 3: Mehmet Kaya</span>
+                </div>
+                <div class="preview-badge online">
+                    <span class="status-dot status-online"></span>
+                    <span>Masa 4: Zeynep Öztürk</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. Question Active Screen -->
+    <div class="screen-state hidden" id="questionScreen">
+        <div class="question-layout">
+            <!-- Left: Timer & Category -->
+            <div class="left-panel">
+                <div class="timer-box">
+                    <div class="timer-value" id="timerValue">30</div>
+                    <div class="timer-label">SANİYE</div>
+                </div>
+
+                <div class="info-box">
+                    <div class="category-label">Kategori</div>
+                    <div class="category-value">Genel Kültür</div>
+                </div>
+
+                <div class="info-box points">
+                    <div class="points-value">10</div>
+                    <div class="points-label">PUAN</div>
+                </div>
+            </div>
+
+            <!-- Center: Quote -->
+            <div class="center-panel">
+                <div class="quote-container">
+                    <div class="quote-icon">💭</div>
+                    <blockquote class="quote-text">
+                        "Bilgi güçtür, bilmek yetmez uygulamak gerekir."
+                    </blockquote>
+                    <cite class="quote-author">— Francis Bacon</cite>
+                </div>
+
+                <div class="thinking-indicator">
+                    <span>Yarışmacılar düşünüyor</span>
+                    <div class="dots">
+                        <span></span><span></span><span></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: Contestants -->
+            <div class="right-panel">
+                <h3 class="panel-title">Yarışmacılar</h3>
+                <div class="contestants-grid">
+                    <div class="contestant-card online">
+                        <div class="contestant-table">1</div>
+                        <div class="contestant-name">Ahmet Y.</div>
+                    </div>
+                    <div class="contestant-card answered">
+                        <div class="contestant-table">2</div>
+                        <div class="contestant-name">Ayşe D.</div>
+                    </div>
+                    <div class="contestant-card online">
+                        <div class="contestant-table">3</div>
+                        <div class="contestant-name">Mehmet K.</div>
+                    </div>
+                    <div class="contestant-card answered">
+                        <div class="contestant-table">4</div>
+                        <div class="contestant-name">Zeynep Ö.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. Grading Screen -->
+    <div class="screen-state hidden" id="gradingScreen">
+        <div class="grading-content">
+            <div class="grading-icon">⏳</div>
+            <h2>Jüri Değerlendirmesi Sürüyor...</h2>
+            <p>Açık uçlu cevaplar değerlendiriliyor</p>
+            <div class="loading-bar">
+                <div class="loading-progress"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. Results Screen -->
+    <div class="screen-state hidden" id="resultsScreen">
+        <div class="results-layout">
+            <!-- Left: Reveal & Answers -->
+            <div class="results-main">
+                <div class="reveal-panel">
+                    <div class="question-reveal reveal-step visible">
+                        <div class="reveal-label">SORU</div>
+                        <div class="reveal-question">
+                            Türkiye Cumhuriyeti'nin başkenti neresidir?
+                        </div>
+                    </div>
+
+                    <div class="answer-reveal reveal-step visible">
+                        <div class="reveal-label">DOĞRU CEVAP</div>
+                        <div class="reveal-answer visible">
+                            Ankara
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Answers Grid -->
+                <div class="answers-panel reveal-step visible">
+                    <h3 class="panel-title">Verilen Cevaplar</h3>
+                    <div class="answers-grid">
+                        <div class="answer-card correct reveal-visible">
+                            <div class="answer-card-header">
+                                <span>Masa 1</span>
+                                <span>Ahmet Y.</span>
+                            </div>
+                            <div class="answer-card-content">Ankara</div>
+                        </div>
+                        <div class="answer-card correct reveal-visible">
+                            <div class="answer-card-header">
+                                <span>Masa 2</span>
+                                <span>Ayşe D.</span>
+                            </div>
+                            <div class="answer-card-content">Ankara</div>
+                        </div>
+                        <div class="answer-card incorrect reveal-visible">
+                            <div class="answer-card-header">
+                                <span>Masa 3</span>
+                                <span>Mehmet K.</span>
+                            </div>
+                            <div class="answer-card-content">İstanbul</div>
+                        </div>
+                        <div class="answer-card empty reveal-visible">
+                            <div class="answer-card-header">
+                                <span>Masa 4</span>
+                                <span>Zeynep Ö.</span>
+                            </div>
+                            <div class="answer-card-content">(Boş)</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Leaderboard -->
+            <div class="leaderboard-panel">
+                <h3 class="panel-title">🏆 Sıralama</h3>
+                <div class="leaderboard">
+                    <div class="leaderboard-entry top-1" style="top: 0px;">
+                        <div class="entry-rank">🥇</div>
+                        <div class="entry-info">
+                            <div class="entry-name">Ahmet Yılmaz</div>
+                            <div class="entry-table">Masa 1</div>
+                        </div>
+                        <div class="entry-score">85</div>
+                    </div>
+                    <div class="leaderboard-entry top-2" style="top: 80px;">
+                        <div class="entry-rank">🥈</div>
+                        <div class="entry-info">
+                            <div class="entry-name">Ayşe Demir</div>
+                            <div class="entry-table">Masa 2</div>
+                        </div>
+                        <div class="entry-score">75</div>
+                    </div>
+                    <div class="leaderboard-entry top-3" style="top: 160px;">
+                        <div class="entry-rank">🥉</div>
+                        <div class="entry-info">
+                            <div class="entry-name">Zeynep Öztürk</div>
+                            <div class="entry-table">Masa 4</div>
+                        </div>
+                        <div class="entry-score">60</div>
+                    </div>
+                    <div class="leaderboard-entry" style="top: 240px;">
+                        <div class="entry-rank">4</div>
+                        <div class="entry-info">
+                            <div class="entry-name">Mehmet Kaya</div>
+                            <div class="entry-table">Masa 3</div>
+                        </div>
+                        <div class="entry-score">45</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Connection Indicator -->
+    <div class="connection-indicator">
+        <span class="status-dot status-online" id="connectionDot"></span>
+    </div>
+
+    <script>
+        // Update screen info
+        function updateScreenInfo() {
+            document.getElementById('resolution').textContent =
+                `${window.innerWidth} x ${window.innerHeight}`;
+            const ratio = (window.innerWidth / window.innerHeight).toFixed(2);
+            document.getElementById('aspectRatio').textContent =
+                `${ratio} ${ratio == '1.78' ? '✓ (16:9)' : ''}`;
+        }
+
+        updateScreenInfo();
+        window.addEventListener('resize', updateScreenInfo);
+
+        // Show specific state
+        function showState(stateId) {
+            document.querySelectorAll('.screen-state').forEach(s => s.classList.add('hidden'));
+            document.getElementById(stateId).classList.remove('hidden');
+        }
+
+        // Fullscreen toggle
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen();
+            } else {
+                document.exitFullscreen();
+            }
+        }
+
+        // Timer demo
+        let timerValue = 30;
+        setInterval(() => {
+            const timerEl = document.getElementById('timerValue');
+            if (timerValue > 0) {
+                timerValue--;
+                timerEl.textContent = timerValue;
+
+                timerEl.classList.remove('warning', 'danger');
+                if (timerValue <= 5) {
+                    timerEl.classList.add('danger');
+                } else if (timerValue <= 10) {
+                    timerEl.classList.add('warning');
+                }
+            } else {
+                timerValue = 30;
+            }
+        }, 1000);
+    </script>
+</body>
+</html>
