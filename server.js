@@ -42,7 +42,7 @@ const upload = multer({
 });
 
 // Veritabanı ve State
-const db = require('./database/db');
+const db = require('./database/postgres');
 const gameState = require('./src/state/gameState');
 
 // Event Handler'lar
@@ -464,12 +464,8 @@ const HOST = '0.0.0.0'; // Tüm ağ arayüzlerinden erişim
 
 async function startServer() {
     try {
-        // Veritabanını başlat (async - sql.js için)
+        // Veritabanını başlat (PostgreSQL)
         await db.initialize();
-        console.log('Veritabanı hazır.');
-
-        // Migrasyonları çalıştır
-        db.runMigrations();
 
         // Varsayılan admin kullanıcısını oluştur
         await db.ensureDefaultAdmin();
@@ -501,14 +497,14 @@ async function startServer() {
 startServer();
 
 // Graceful Shutdown
-process.on('SIGINT', () => {
+process.on('SIGINT', async () => {
     console.log('\nSunucu kapatılıyor...');
-    db.close();
+    await db.close();
     process.exit(0);
 });
 
-process.on('SIGTERM', () => {
+process.on('SIGTERM', async () => {
     console.log('\nSunucu kapatılıyor...');
-    db.close();
+    await db.close();
     process.exit(0);
 });

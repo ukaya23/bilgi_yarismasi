@@ -2,7 +2,7 @@
  * Jüri Event Handler
  */
 
-const db = require('../../database/db');
+const db = require('../../database/postgres');
 const gameState = require('../state/gameState');
 
 function registerJuryHandlers(io, socket) {
@@ -15,7 +15,7 @@ function registerJuryHandlers(io, socket) {
     socket.emit('GAME_STATE', gameState.getState());
 
     // Grup puanlama (tüm gruba aynı puan)
-    socket.on('JURY_APPROVE_GROUP', (data) => {
+    socket.on('JURY_APPROVE_GROUP', async (data) => {
         try {
             const { answerIds, isCorrect, points } = data;
 
@@ -24,7 +24,7 @@ function registerJuryHandlers(io, socket) {
                 return;
             }
 
-            db.gradeAnswersBulk(answerIds, isCorrect, points);
+            await db.gradeAnswersBulk(answerIds, isCorrect, points);
 
             socket.emit('JURY_ACTION_RESULT', {
                 success: true,
@@ -39,11 +39,11 @@ function registerJuryHandlers(io, socket) {
     });
 
     // Tekil cevap puanlama
-    socket.on('JURY_MANUAL_SCORE', (data) => {
+    socket.on('JURY_MANUAL_SCORE', async (data) => {
         try {
             const { answerId, isCorrect, points } = data;
 
-            db.gradeAnswer(answerId, isCorrect, points);
+            await db.gradeAnswer(answerId, isCorrect, points);
 
             socket.emit('JURY_ACTION_RESULT', {
                 success: true,
@@ -58,9 +58,9 @@ function registerJuryHandlers(io, socket) {
     });
 
     // Değerlendirmeyi tamamla ve sonuçları göster
-    socket.on('JURY_COMMIT_RESULTS', () => {
+    socket.on('JURY_COMMIT_RESULTS', async () => {
         try {
-            gameState.showResults();
+            await gameState.showResults();
 
             socket.emit('JURY_ACTION_RESULT', {
                 success: true,
@@ -74,10 +74,10 @@ function registerJuryHandlers(io, socket) {
     });
 
     // Güncel cevapları iste
-    socket.on('JURY_REQUEST_ANSWERS', (data) => {
+    socket.on('JURY_REQUEST_ANSWERS', async (data) => {
         try {
             const { questionId } = data;
-            const answers = db.getAnswersForQuestion(questionId);
+            const answers = await db.getAnswersForQuestion(questionId);
 
             socket.emit('JURY_ANSWERS_DATA', { questionId, answers });
         } catch (error) {

@@ -2,10 +2,10 @@
  * Seyirci Ekranı Event Handler
  */
 
-const db = require('../../database/db');
+const db = require('../../database/postgres');
 const gameState = require('../state/gameState');
 
-function registerScreenHandlers(io, socket) {
+async function registerScreenHandlers(io, socket) {
     console.log(`[SCREEN] Bağlandı: ${socket.id}`);
 
     // Screen odasına katıl
@@ -13,15 +13,19 @@ function registerScreenHandlers(io, socket) {
 
     // İlk verileri gönder
     socket.emit('INIT_DATA', {
-        contestants: db.getAllContestants(),
-        leaderboard: db.getLeaderboard(),
+        contestants: await db.getAllContestants(),
+        leaderboard: await db.getLeaderboard(),
         gameState: gameState.getState(),
-        quote: db.getRandomQuote()
+        quote: await db.getRandomQuote()
     });
 
     // Yeni özlü söz iste
-    socket.on('SCREEN_REQUEST_QUOTE', () => {
-        socket.emit('NEW_QUOTE', db.getRandomQuote());
+    socket.on('SCREEN_REQUEST_QUOTE', async () => {
+        try {
+            socket.emit('NEW_QUOTE', await db.getRandomQuote());
+        } catch (error) {
+            console.error('[SCREEN] Quote fetch error:', error);
+        }
     });
 
     // Bağlantı kopması

@@ -1,6 +1,25 @@
 version: '3.8'
 
 services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: quiz-postgres
+    environment:
+      POSTGRES_DB: quiz_game
+      POSTGRES_USER: quiz_admin
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/migrations:/docker-entrypoint-initdb.d
+    networks:
+      - quiz-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U quiz_admin"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: always
+
   quiz-server:
     build: .
     container_name: bilgi-yarismasi
@@ -12,9 +31,19 @@ services:
     restart: always
     environment:
       - NODE_ENV=production
+      - DATABASE_URL=${DATABASE_URL}
+      - JWT_SECRET=${JWT_SECRET}
+      - PORT=${PORT}
+      - HOST=${HOST}
     networks:
       - quiz-network
+    depends_on:
+      postgres:
+        condition: service_healthy
 
 networks:
   quiz-network:
     driver: bridge
+
+volumes:
+  postgres_data:

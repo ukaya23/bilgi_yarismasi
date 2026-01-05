@@ -2,10 +2,10 @@
  * Admin (Sunucu) Event Handler
  */
 
-const db = require('../../database/db');
+const db = require('../../database/postgres');
 const gameState = require('../state/gameState');
 
-function registerAdminHandlers(io, socket) {
+async function registerAdminHandlers(io, socket) {
     console.log(`[ADMIN] Bağlandı: ${socket.id}`);
 
     // Admin odasına katıl
@@ -13,17 +13,17 @@ function registerAdminHandlers(io, socket) {
 
     // İlk durumu gönder
     socket.emit('INIT_DATA', {
-        questions: db.getAllQuestions(),
-        contestants: db.getAllContestants(),
+        questions: await db.getAllQuestions(),
+        contestants: await db.getAllContestants(),
         gameState: gameState.getState(),
-        leaderboard: db.getLeaderboard()
+        leaderboard: await db.getLeaderboard()
     });
 
     // Soru başlat
-    socket.on('ADMIN_START_QUESTION', (data) => {
+    socket.on('ADMIN_START_QUESTION', async (data) => {
         try {
             const { questionId } = data;
-            gameState.startQuestion(questionId);
+            await gameState.startQuestion(questionId);
             socket.emit('ACTION_RESULT', { success: true, action: 'START_QUESTION' });
         } catch (error) {
             socket.emit('ACTION_RESULT', { success: false, error: error.message });
@@ -31,9 +31,9 @@ function registerAdminHandlers(io, socket) {
     });
 
     // Soruyu erken bitir
-    socket.on('ADMIN_SKIP_TO_GRADING', () => {
+    socket.on('ADMIN_SKIP_TO_GRADING', async () => {
         try {
-            gameState.lockQuestion();
+            await gameState.lockQuestion();
             socket.emit('ACTION_RESULT', { success: true, action: 'SKIP_TO_GRADING' });
         } catch (error) {
             socket.emit('ACTION_RESULT', { success: false, error: error.message });
@@ -41,9 +41,9 @@ function registerAdminHandlers(io, socket) {
     });
 
     // Sonuçları göster
-    socket.on('ADMIN_REVEAL_RESULTS', () => {
+    socket.on('ADMIN_REVEAL_RESULTS', async () => {
         try {
-            gameState.showResults();
+            await gameState.showResults();
             socket.emit('ACTION_RESULT', { success: true, action: 'REVEAL_RESULTS' });
         } catch (error) {
             socket.emit('ACTION_RESULT', { success: false, error: error.message });
@@ -51,9 +51,9 @@ function registerAdminHandlers(io, socket) {
     });
 
     // Bekleme moduna geç
-    socket.on('ADMIN_GO_IDLE', () => {
+    socket.on('ADMIN_GO_IDLE', async () => {
         try {
-            gameState.goToIdle();
+            await gameState.goToIdle();
             socket.emit('ACTION_RESULT', { success: true, action: 'GO_IDLE' });
         } catch (error) {
             socket.emit('ACTION_RESULT', { success: false, error: error.message });
@@ -61,9 +61,9 @@ function registerAdminHandlers(io, socket) {
     });
 
     // Oyunu sıfırla
-    socket.on('ADMIN_RESET_GAME', () => {
+    socket.on('ADMIN_RESET_GAME', async () => {
         try {
-            gameState.resetGame();
+            await gameState.resetGame();
             socket.emit('ACTION_RESULT', { success: true, action: 'RESET_GAME' });
         } catch (error) {
             socket.emit('ACTION_RESULT', { success: false, error: error.message });
@@ -71,10 +71,10 @@ function registerAdminHandlers(io, socket) {
     });
 
     // Yeni soru ekle
-    socket.on('ADMIN_ADD_QUESTION', (data) => {
+    socket.on('ADMIN_ADD_QUESTION', async (data) => {
         try {
-            const id = db.addQuestion(data);
-            io.to('admin').emit('QUESTIONS_UPDATED', db.getAllQuestions());
+            const id = await db.addQuestion(data);
+            io.to('admin').emit('QUESTIONS_UPDATED', await db.getAllQuestions());
             socket.emit('ACTION_RESULT', { success: true, action: 'ADD_QUESTION', id });
         } catch (error) {
             socket.emit('ACTION_RESULT', { success: false, error: error.message });
@@ -82,11 +82,11 @@ function registerAdminHandlers(io, socket) {
     });
 
     // Soru güncelle
-    socket.on('ADMIN_UPDATE_QUESTION', (data) => {
+    socket.on('ADMIN_UPDATE_QUESTION', async (data) => {
         try {
             const { id, ...question } = data;
-            db.updateQuestion(id, question);
-            io.to('admin').emit('QUESTIONS_UPDATED', db.getAllQuestions());
+            await db.updateQuestion(id, question);
+            io.to('admin').emit('QUESTIONS_UPDATED', await db.getAllQuestions());
             socket.emit('ACTION_RESULT', { success: true, action: 'UPDATE_QUESTION' });
         } catch (error) {
             socket.emit('ACTION_RESULT', { success: false, error: error.message });
@@ -94,10 +94,10 @@ function registerAdminHandlers(io, socket) {
     });
 
     // Soru sil
-    socket.on('ADMIN_DELETE_QUESTION', (data) => {
+    socket.on('ADMIN_DELETE_QUESTION', async (data) => {
         try {
-            db.deleteQuestion(data.id);
-            io.to('admin').emit('QUESTIONS_UPDATED', db.getAllQuestions());
+            await db.deleteQuestion(data.id);
+            io.to('admin').emit('QUESTIONS_UPDATED', await db.getAllQuestions());
             socket.emit('ACTION_RESULT', { success: true, action: 'DELETE_QUESTION' });
         } catch (error) {
             socket.emit('ACTION_RESULT', { success: false, error: error.message });
@@ -105,8 +105,8 @@ function registerAdminHandlers(io, socket) {
     });
 
     // Yarışmacıları yenile
-    socket.on('ADMIN_REFRESH_CONTESTANTS', () => {
-        socket.emit('CONTESTANTS_UPDATED', db.getAllContestants());
+    socket.on('ADMIN_REFRESH_CONTESTANTS', async () => {
+        socket.emit('CONTESTANTS_UPDATED', await db.getAllContestants());
     });
 
     // Sonuç açıklama adımını ilerlet

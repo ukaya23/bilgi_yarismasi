@@ -9,7 +9,7 @@
  * - REVEAL: Sonuç gösterimi
  */
 
-const db = require('../../database/db');
+const db = require('../../database/postgres');
 
 class GameState {
     constructor() {
@@ -49,7 +49,7 @@ class GameState {
     /**
      * Durumu değiştir ve tüm istemcilere bildir
      */
-    setState(newState) {
+    async setState(newState) {
         // Geçerli durum geçişlerini kontrol et
         const validTransitions = {
             'IDLE': ['QUESTION_ACTIVE'],
@@ -66,7 +66,7 @@ class GameState {
         }
 
         this.state = newState;
-        db.updateSessionState(newState, this.currentQuestion?.id || null);
+        await db.updateSessionState(newState, this.currentQuestion?.id || null);
 
         if (this.io) {
             this.io.emit('GAME_STATE', this.getState());
@@ -78,8 +78,8 @@ class GameState {
     /**
      * Yeni soru başlat
      */
-    startQuestion(questionId) {
-        const question = db.getQuestionById(questionId);
+    async startQuestion(questionId) {
+        const question = await db.getQuestionById(questionId);
         if (!question) {
             throw new Error('Soru bulunamadı');
         }
@@ -90,14 +90,14 @@ class GameState {
         }
 
         // Sorunun sırasını ve toplam soru sayısını bul
-        const allQuestions = db.getAllQuestions();
+        const allQuestions = await db.getAllQuestions();
         const questionIndex = allQuestions.findIndex(q => q.id === question.id) + 1;
         const totalQuestions = allQuestions.length;
 
         this.currentQuestion = {
             ...question,
-            options: question.options ? JSON.parse(question.options) : null,
-            correct_keys: question.correct_keys ? JSON.parse(question.correct_keys) : [],
+            options: question.options || null,
+            correct_keys: question.correct_keys || [],
             index: questionIndex,
             total: totalQuestions
         };
@@ -105,7 +105,7 @@ class GameState {
         this.timeRemaining = question.duration;
         this.answeredPlayers.clear();
 
-        this.setState('QUESTION_ACTIVE');
+        await this.setState('QUESTION_ACTIVE');
 
         // Yarışmacılara ve jüriye soruyu gönder
         if (this.io) {
@@ -134,7 +134,7 @@ class GameState {
             });
 
             // Seyirciye maskelenmiş soru gönder
-            const quote = db.getRandomQuote();
+            const quote = await db.getRandomQuote();
             this.io.to('screen').emit('MASKED_QUESTION', {
                 category: this.currentQuestion.category || 'Genel Kültür',
                 points: this.currentQuestion.points,
@@ -154,7 +154,7 @@ class GameState {
      * Zamanlayıcıyı başlat
      */
     startTimer() {
-        this.timer = setInterval(() => {
+        this.timer = setInterval(async () => {
             this.timeRemaining--;
 
             if (this.io) {
@@ -165,7 +165,7 @@ class GameState {
             }
 
             if (this.timeRemaining <= 0) {
-                this.lockQuestion();
+                await this.lockQuestion();
             }
         }, 1000);
     }
@@ -173,39 +173,39 @@ class GameState {
     /**
      * Soruyu kilitle (süre doldu)
      */
-    lockQuestion() {
+    async lockQuestion() {
         if (this.timer) {
             clearInterval(this.timer);
             this.timer = null;
         }
 
-        this.setState('LOCKED');
+        await this.setState('LOCKED');
 
         // Açık uçlu soruysa jüri değerlendirmesine geç
         if (this.currentQuestion && this.currentQuestion.type === 'OPEN_ENDED') {
-            setTimeout(() => {
-                this.startGrading();
+            setTimeout(async () => {
+                await this.startGrading();
             }, 1000);
         } else {
             // Çoktan seçmeli ise otomatik puanla ve sonuçları göster
-            this.autoGradeMultipleChoice();
+            await this.autoGradeMultipleChoice();
         }
     }
 
     /**
      * Çoktan seçmeli soruyu otomatik puanla
      */
-    autoGradeMultipleChoice() {
+    async autoGradeMultipleChoice() {
         if (!this.currentQuestion) return;
 
         // 1. Önce cevap vermeyenler için boş cevap oluştur
-        const existingAnswers = db.getAnswersForQuestion(this.currentQuestion.id);
-        const allContestants = db.getAllContestants();
+        const existingAnswers = await db.getAnswersForQuestion(this.currentQuestion.id);
+        const allContestants = await db.getAllContestants();
         const answeredContestantIds = new Set(existingAnswers.map(a => a.contestant_id));
 
         for (const contestant of allContestants) {
             if (!answeredContestantIds.has(contestant.id) && contestant.status !== 'OFFLINE') {
-                db.saveAnswer(
+                await db.saveAnswer(
                     this.currentQuestion.id,
                     contestant.id,
                     '', // Boş cevap
@@ -215,37 +215,37 @@ class GameState {
         }
 
         // 2. Güncel cevap listesini al ve puanla
-        const answers = db.getAnswersForQuestion(this.currentQuestion.id);
+        const answers = await db.getAnswersForQuestion(this.currentQuestion.id);
         const correctKeys = this.currentQuestion.correct_keys;
 
         for (const answer of answers) {
             // Boş cevaplar zaten yanlış sayılacak
             if (!answer.answer_text) {
-                db.gradeAnswer(answer.id, false, 0);
+                await db.gradeAnswer(answer.id, false, 0);
                 continue;
             }
 
             const isCorrect = correctKeys.includes(answer.answer_text);
             const points = isCorrect ? this.currentQuestion.points : 0;
-            db.gradeAnswer(answer.id, isCorrect, points);
+            await db.gradeAnswer(answer.id, isCorrect, points);
         }
 
-        setTimeout(() => {
-            this.showResults();
+        setTimeout(async () => {
+            await this.showResults();
         }, 500);
     }
 
     /**
      * Jüri değerlendirmesini başlat
      */
-    startGrading() {
-        this.setState('GRADING');
+    async startGrading() {
+        await this.setState('GRADING');
 
         if (!this.currentQuestion || !this.io) return;
 
         // Cevapları ve tüm yarışmacıları al
-        let answers = db.getAnswersForQuestion(this.currentQuestion.id);
-        const allContestants = db.getAllContestants();
+        let answers = await db.getAnswersForQuestion(this.currentQuestion.id);
+        const allContestants = await db.getAllContestants();
 
         // Cevap vermeyenleri bul ve boş cevap olarak ekle
         const answeredContestantIds = new Set(answers.map(a => a.contestant_id));
@@ -253,7 +253,7 @@ class GameState {
         // Cevap vermeyenler için boş cevap kaydı oluştur
         for (const contestant of allContestants) {
             if (!answeredContestantIds.has(contestant.id) && contestant.status !== 'OFFLINE') {
-                db.saveAnswer(
+                await db.saveAnswer(
                     this.currentQuestion.id,
                     contestant.id,
                     '', // Boş cevap metni
@@ -263,7 +263,7 @@ class GameState {
         }
 
         // 4. Cevapları tekrar çek (yeni eklenenler dahil)
-        answers = db.getAnswersForQuestion(this.currentQuestion.id);
+        answers = await db.getAnswersForQuestion(this.currentQuestion.id);
 
         const groupedAnswers = this.groupAnswers(answers);
 
@@ -353,7 +353,7 @@ class GameState {
     /**
      * Cevap gönderimini işle
      */
-    submitAnswer(contestantId, answerText, timeRemaining) {
+    async submitAnswer(contestantId, answerText, timeRemaining) {
         if (this.state !== 'QUESTION_ACTIVE') {
             return { success: false, message: 'Cevap kabul edilmiyor' };
         }
@@ -366,7 +366,7 @@ class GameState {
             return { success: false, message: 'Zaten cevap verildi' };
         }
 
-        const result = db.saveAnswer(
+        const result = await db.saveAnswer(
             this.currentQuestion.id,
             contestantId,
             answerText,
@@ -391,25 +391,25 @@ class GameState {
     /**
      * Jüri puanlamasını uygula
      */
-    applyJuryGrades(grades) {
+    async applyJuryGrades(grades) {
         // grades: [{ answerId, isCorrect, points }, ...]
         for (const grade of grades) {
-            db.gradeAnswer(grade.answerId, grade.isCorrect, grade.points);
+            await db.gradeAnswer(grade.answerId, grade.isCorrect, grade.points);
         }
     }
 
     /**
      * Sonuçları göster
      */
-    showResults() {
-        this.setState('REVEAL');
+    async showResults() {
+        await this.setState('REVEAL');
         this.currentRevealStep = 0; // Adım sayacını sıfırla
 
         if (!this.currentQuestion || !this.io) return;
 
-        const answers = db.getAnswersForQuestion(this.currentQuestion.id);
-        const leaderboard = db.getLeaderboard();
-        const controlMode = db.getSetting('screen_control_mode') || 'AUTO';
+        const answers = await db.getAnswersForQuestion(this.currentQuestion.id);
+        const leaderboard = await db.getLeaderboard();
+        const controlMode = await db.getSetting('screen_control_mode') || 'AUTO';
 
         // Tüm ekranlara sonuçları gönder (Başlangıç verisi)
         this.io.emit('SHOW_RESULTS', {
@@ -472,7 +472,7 @@ class GameState {
     /**
      * Bekleme moduna dön
      */
-    goToIdle() {
+    async goToIdle() {
         if (this.timer) {
             clearInterval(this.timer);
             this.timer = null;
@@ -483,21 +483,21 @@ class GameState {
         this.timeRemaining = 0;
         this.answeredPlayers.clear();
 
-        this.setState('IDLE');
+        await this.setState('IDLE');
     }
 
     /**
      * Oyunu sıfırla
      */
-    resetGame() {
-        this.goToIdle();
-        db.resetAllContestants();
+    async resetGame() {
+        await this.goToIdle();
+        await db.resetAllContestants();
 
         if (this.io) {
             this.io.emit('GAME_RESET');
             // Sıfırlama sonrası güncel yarışmacı listesi ve liderlik tablosunu gönder
-            const updatedContestants = db.getAllContestants();
-            const updatedLeaderboard = db.getLeaderboard();
+            const updatedContestants = await db.getAllContestants();
+            const updatedLeaderboard = await db.getLeaderboard();
             this.io.emit('CONTESTANTS_UPDATED', updatedContestants);
             this.io.emit('LEADERBOARD_UPDATED', updatedLeaderboard);
         }

@@ -2,7 +2,7 @@
  * Yarışmacı Event Handler
  */
 
-const db = require('../../database/db');
+const db = require('../../database/postgres');
 const gameState = require('../state/gameState');
 
 // Socket ID -> Contestant ID mapping (reconnect için)
@@ -23,7 +23,7 @@ function registerPlayerHandlers(io, socket) {
     });
 
     // Giriş
-    socket.on('PLAYER_LOGIN', (data) => {
+    socket.on('PLAYER_LOGIN', async (data) => {
         try {
             const { name, tableNo } = data;
 
@@ -33,8 +33,8 @@ function registerPlayerHandlers(io, socket) {
             }
 
             // Yarışmacıyı veritabanına ekle/güncelle
-            const contestantId = db.upsertContestant(name, parseInt(tableNo));
-            db.updateContestantSocket(contestantId, socket.id);
+            const contestantId = await db.upsertContestant(name, parseInt(tableNo));
+            await db.updateContestantSocket(contestantId, socket.id);
 
             // Socket'e contestant ID'yi kaydet
             socket.contestantId = contestantId;
@@ -54,8 +54,8 @@ function registerPlayerHandlers(io, socket) {
             socket.emit('GAME_STATE', gameState.getState());
 
             // Tüm admin ve seyircilere bildir
-            io.to('admin').emit('CONTESTANTS_UPDATED', db.getAllContestants());
-            io.to('screen').emit('CONTESTANTS_UPDATED', db.getAllContestants());
+            io.to('admin').emit('CONTESTANTS_UPDATED', await db.getAllContestants());
+            io.to('screen').emit('CONTESTANTS_UPDATED', await db.getAllContestants());
 
             console.log(`[PLAYER] Giriş başarılı: ${name} (Masa ${tableNo}) - Contestant ID: ${contestantId}`);
         } catch (error) {
@@ -65,7 +65,7 @@ function registerPlayerHandlers(io, socket) {
     });
 
     // Cevap gönder
-    socket.on('PLAYER_SUBMIT_ANSWER', (data) => {
+    socket.on('PLAYER_SUBMIT_ANSWER', async (data) => {
         try {
             const contestantId = socket.contestantId;
 
@@ -80,7 +80,7 @@ function registerPlayerHandlers(io, socket) {
             const { answer, timeRemaining } = data;
             console.log(`[PLAYER] Cevap: "${answer}", Kalan süre: ${timeRemaining}`);
 
-            const result = gameState.submitAnswer(contestantId, answer, timeRemaining);
+            const result = await gameState.submitAnswer(contestantId, answer, timeRemaining);
 
             socket.emit('ANSWER_RESULT', result);
 
@@ -101,13 +101,13 @@ function registerPlayerHandlers(io, socket) {
     });
 
     // Bağlantı kopması
-    socket.on('disconnect', () => {
+    socket.on('disconnect', async () => {
         const contestantId = socket.contestantId;
         if (contestantId) {
-            db.updateContestantStatus(contestantId, 'OFFLINE');
+            await db.updateContestantStatus(contestantId, 'OFFLINE');
             socketContestantMap.delete(socket.id);
-            io.to('admin').emit('CONTESTANTS_UPDATED', db.getAllContestants());
-            io.to('screen').emit('CONTESTANTS_UPDATED', db.getAllContestants());
+            io.to('admin').emit('CONTESTANTS_UPDATED', await db.getAllContestants());
+            io.to('screen').emit('CONTESTANTS_UPDATED', await db.getAllContestants());
             console.log(`[PLAYER] Ayrıldı: Yarışmacı ${contestantId}`);
         }
     });
