@@ -29,12 +29,19 @@ class SocketManager {
         // Bağlantı olayları
         this.socket.on('connect', () => {
             console.log('[SOCKET] Bağlandı:', this.socket.id);
+            const wasConnected = this.isConnected;
             this.isConnected = true;
-            this.reconnectAttempts = 0;
             this.hideConnectionOverlay();
 
             // Role katıl
             this.socket.emit('JOIN_ROOM', { role: this.role });
+
+            // Yeniden bağlantı durumunda callback çağır
+            if (wasConnected && this.onReconnectCallback) {
+                console.log('[SOCKET] Yeniden bağlandı, state senkronizasyonu...');
+                this.onReconnectCallback();
+            }
+            this.reconnectAttempts = 0;
         });
 
         this.socket.on('disconnect', (reason) => {
@@ -93,6 +100,13 @@ class SocketManager {
 
     getSocket() {
         return this.socket;
+    }
+
+    /**
+     * Yeniden bağlantı callback'i ayarla
+     */
+    onReconnect(callback) {
+        this.onReconnectCallback = callback;
     }
 }
 

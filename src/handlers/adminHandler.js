@@ -111,7 +111,6 @@ function registerAdminHandlers(io, socket) {
 
     // Sonuç açıklama adımını ilerlet
     socket.on('ADMIN_NEXT_STEP', () => {
-        const gameState = require('../state/gameState'); // Circular dependency önlemek için burada require edilebilir veya yukarısı kontrol edilir
         if (gameState.state === 'REVEAL') {
             gameState.nextRevealStep();
         }

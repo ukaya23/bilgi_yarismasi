@@ -81,6 +81,17 @@ function initializeSocket() {
     setupSocketEvents();
     updateConnectionStatus();
 
+    // Yeniden bağlantıda durumu senkronize et
+    socketManager.onReconnect(() => {
+        console.log('[PLAYER] Reconnect - yeniden giriş yapılıyor...');
+        if (playerData) {
+            socketManager.emit('PLAYER_LOGIN', {
+                name: playerData.name,
+                tableNo: playerData.tableNo
+            });
+        }
+    });
+
     showScreen('waitingScreen');
     updatePlayerInfo();
 }

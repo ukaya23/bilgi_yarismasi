@@ -316,6 +316,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     setupSocketEvents();
     updateConnectionStatus();
+
+    // Yeniden bağlantıda durumu senkronize et
+    socketManager.onReconnect(() => {
+        console.log('[SCREEN] Reconnect - state senkronizasyonu...');
+    });
 });
 
 // ==================== SOCKET EVENTS ====================

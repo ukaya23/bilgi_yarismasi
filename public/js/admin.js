@@ -56,6 +56,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupEventListeners();
     setupSocketEvents();
 
+    // Yeniden bağlantıda verileri yenile
+    socketManager.onReconnect(() => {
+        console.log('[ADMIN] Reconnect - verileri yeniliyorum...');
+        loadActiveCompetition();
+        loadSettings();
+    });
+
     // Yarışma yönetimi
     loadActiveCompetition();
     loadSettings();
@@ -935,7 +942,7 @@ async function removeImage() {
         // Sunucudan sil
         const filename = mediaUrl.split('/').pop();
         try {
-            await fetch(`/ api / upload / ${filename} `, {
+            await fetch(`/api/upload/${filename}`, {
                 method: 'DELETE',
                 headers: { 'X-Admin-Token': adminToken }
             });

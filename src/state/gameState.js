@@ -50,6 +50,21 @@ class GameState {
      * Durumu değiştir ve tüm istemcilere bildir
      */
     setState(newState) {
+        // Geçerli durum geçişlerini kontrol et
+        const validTransitions = {
+            'IDLE': ['QUESTION_ACTIVE'],
+            'QUESTION_ACTIVE': ['LOCKED'],
+            'LOCKED': ['GRADING', 'REVEAL'],
+            'GRADING': ['REVEAL'],
+            'REVEAL': ['IDLE', 'QUESTION_ACTIVE']
+        };
+
+        const allowed = validTransitions[this.state];
+        if (allowed && !allowed.includes(newState)) {
+            console.warn(`[STATE] Geçersiz geçiş: ${this.state} -> ${newState}`);
+            // Uyarı ver ama izin ver (eski davranış korunsun)
+        }
+
         this.state = newState;
         db.updateSessionState(newState, this.currentQuestion?.id || null);
 

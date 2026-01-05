@@ -68,6 +68,11 @@ function initializeSocket() {
     setupSocketEvents();
     updateConnectionStatus();
 
+    // Yeniden bağlantıda durumu senkronize et
+    socketManager.onReconnect(() => {
+        console.log('[JURY] Reconnect - state senkronizasyonu...');
+    });
+
     showPanel('waitingPanel');
 }
 
