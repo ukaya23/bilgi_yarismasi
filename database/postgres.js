@@ -222,8 +222,8 @@ class PostgresDatabase {
         const client = await this.pool.connect();
         try {
             await client.query('BEGIN');
-            await client.query('DELETE FROM answers');
-            await client.query('DELETE FROM contestants');
+            // TRUNCATE is faster and resets auto-increment IDs. CASCADE cleans up answers too.
+            await client.query('TRUNCATE TABLE contestants, answers RESTART IDENTITY CASCADE');
             await client.query('COMMIT');
         } catch (error) {
             await client.query('ROLLBACK');
@@ -231,6 +231,17 @@ class PostgresDatabase {
         } finally {
             client.release();
         }
+    }
+
+    /**
+     * Yarışmadaki tüm erişim kodlarını sıfırla (tekrar kullanım için)
+     */
+    async resetAllAccessCodes(competitionId) {
+        const result = await this.pool.query(
+            'UPDATE access_codes SET is_used = false, session_token = NULL, used_at = NULL WHERE competition_id = $1',
+            [competitionId]
+        );
+        return result.rowCount;
     }
 
     // ==================== CEVAP İŞLEMLERİ ====================
@@ -434,7 +445,7 @@ class PostgresDatabase {
     /**
      * Ayar güncelle veya ekle
      */
-    async upsertSetting(key, value, description = null) {
+    async setSetting(key, value, description = null) {
         const result = await this.pool.query(`
             INSERT INTO settings (key, value, description)
             VALUES ($1, $2, $3)
@@ -594,25 +605,49 @@ class PostgresDatabase {
     }
 
     /**
-     * Session token ile erişim kodunu bul
+     * Session token ile erişim kodunu bul (Competition JOIN ile)
      */
-    async getAccessCodeByToken(token) {
-        const result = await this.pool.query(
-            'SELECT * FROM access_codes WHERE session_token = $1',
-            [token]
-        );
+    async validateSessionToken(token) {
+        const result = await this.pool.query(`
+            SELECT ac.*, c.name as competition_name
+            FROM access_codes ac
+            JOIN competitions c ON ac.competition_id = c.id
+            WHERE ac.session_token = $1 AND c.status = 'ACTIVE'
+        `, [token]);
         return result.rows[0] || null;
     }
 
     /**
      * Yarışma erişim kodlarını getir
      */
-    async getCompetitionAccessCodes(competitionId) {
+    async getAccessCodesByCompetition(competitionId) {
         const result = await this.pool.query(
             'SELECT * FROM access_codes WHERE competition_id = $1 ORDER BY role, slot_number',
             [competitionId]
         );
         return result.rows;
+    }
+
+    /**
+     * Erişim kodu ismini güncelle
+     */
+    async updateAccessCodeName(codeId, name) {
+        const result = await this.pool.query(
+            'UPDATE access_codes SET name = $1 WHERE id = $2',
+            [name, codeId]
+        );
+        return result.rowCount;
+    }
+
+    /**
+     * Erişim kodunu sıfırla
+     */
+    async resetAccessCode(codeId) {
+        const result = await this.pool.query(
+            'UPDATE access_codes SET is_used = false, session_token = NULL, used_at = NULL WHERE id = $1',
+            [codeId]
+        );
+        return result.rowCount;
     }
 }
 

@@ -168,15 +168,15 @@ app.get('/api/auth/check-admin', (req, res) => {
 });
 
 // Erişim kodu doğrulama (Yarışmacı/Jüri)
-app.post('/api/auth/validate-code', (req, res) => {
+app.post('/api/auth/validate-code', async (req, res) => {
     try {
         const { code } = req.body;
 
-        if (!code || code.length !== 6) {
+        if (!code || code.length < 6) {
             return res.status(400).json({ error: 'Geçersiz kod formatı' });
         }
 
-        const result = db.validateAccessCode(code);
+        const result = await db.validateAccessCode(code);
 
         if (!result.valid) {
             return res.status(401).json({ error: result.message });
@@ -184,7 +184,7 @@ app.post('/api/auth/validate-code', (req, res) => {
 
         // Session token oluştur
         const sessionToken = uuidv4();
-        db.markCodeAsUsed(result.accessCode.id, sessionToken);
+        await db.markCodeAsUsed(result.accessCode.id, sessionToken);
 
         res.json({
             success: true,
@@ -201,7 +201,7 @@ app.post('/api/auth/validate-code', (req, res) => {
 });
 
 // Session token kontrolü
-app.post('/api/auth/validate-session', (req, res) => {
+app.post('/api/auth/validate-session', async (req, res) => {
     try {
         const { sessionToken } = req.body;
 
@@ -209,7 +209,7 @@ app.post('/api/auth/validate-session', (req, res) => {
             return res.json({ valid: false });
         }
 
-        const accessCode = db.validateSessionToken(sessionToken);
+        const accessCode = await db.validateSessionToken(sessionToken);
 
         if (!accessCode) {
             return res.json({ valid: false });
@@ -231,7 +231,7 @@ app.post('/api/auth/validate-session', (req, res) => {
 // ==================== COMPETITION API ROUTES ====================
 
 // Yarışma oluştur
-app.post('/api/competition', requireAdminAuth, (req, res) => {
+app.post('/api/competition', requireAdminAuth, async (req, res) => {
     try {
         const { name, contestantCount, juryCount } = req.body;
 
@@ -240,18 +240,18 @@ app.post('/api/competition', requireAdminAuth, (req, res) => {
         }
 
         // Mevcut aktif yarışmayı kapat
-        const activeCompetition = db.getActiveCompetition();
+        const activeCompetition = await db.getActiveCompetition();
         if (activeCompetition) {
             console.log('[DEBUG] Mevcut aktif yarışma kapatılıyor:', activeCompetition.id);
-            db.updateCompetitionStatus(activeCompetition.id, 'COMPLETED');
+            await db.updateCompetitionStatus(activeCompetition.id, 'COMPLETED');
         }
 
         // Yeni yarışma oluştur
-        const competitionId = db.createCompetition(name, contestantCount, juryCount);
+        const competitionId = await db.createCompetition(name, contestantCount, juryCount);
         console.log('[DEBUG] Yeni yarışma ID:', competitionId);
 
         // Erişim kodlarını oluştur
-        const codes = db.generateAccessCodes(competitionId, contestantCount, juryCount);
+        const codes = await db.generateAccessCodes(competitionId, contestantCount, juryCount);
         console.log('[DEBUG] Oluşturulan kodlar:', codes.length, 'adet');
 
         res.json({
@@ -266,12 +266,13 @@ app.post('/api/competition', requireAdminAuth, (req, res) => {
 });
 
 // Yarışmayı sonlandır
-app.post('/api/competition/end', requireAdminAuth, (req, res) => {
+app.post('/api/competition/end', requireAdminAuth, async (req, res) => {
     try {
-        const activeCompetition = db.getActiveCompetition();
+        const activeCompetition = await db.getActiveCompetition();
         if (activeCompetition) {
-            db.updateCompetitionStatus(activeCompetition.id, 'COMPLETED');
-            gameState.resetGame(); // Oyunu da resetle
+            await db.updateCompetitionStatus(activeCompetition.id, 'COMPLETED');
+            await db.resetAllAccessCodes(activeCompetition.id); // Kodları da sıfırla ki tekrar kullanılabilsin (opsiyonel)
+            await gameState.resetGame(); // Oyunu da resetle
             console.log('[COMPETITION] Yarışma sonlandırıldı:', activeCompetition.id);
         }
         res.json({ success: true });
@@ -282,15 +283,15 @@ app.post('/api/competition/end', requireAdminAuth, (req, res) => {
 });
 
 // Aktif yarışmayı getir
-app.get('/api/competition/active', (req, res) => {
+app.get('/api/competition/active', async (req, res) => {
     try {
-        const competition = db.getActiveCompetition();
+        const competition = await db.getActiveCompetition();
         console.log('[DEBUG] Aktif yarışma:', competition);
         if (!competition) {
             return res.json({ active: false });
         }
 
-        const codes = db.getAccessCodesByCompetition(competition.id);
+        const codes = await db.getAccessCodesByCompetition(competition.id);
         console.log('[DEBUG] Yarışma kodları:', codes.length, 'adet, yarışma ID:', competition.id);
         res.json({
             active: true,
@@ -304,7 +305,7 @@ app.get('/api/competition/active', (req, res) => {
 });
 
 // Erişim kodu ismini güncelle
-app.put('/api/competition/code/:id', requireAdminAuth, (req, res) => {
+app.put('/api/competition/code/:id', requireAdminAuth, async (req, res) => {
     try {
         const { id } = req.params;
         const { name } = req.body;
@@ -313,7 +314,7 @@ app.put('/api/competition/code/:id', requireAdminAuth, (req, res) => {
             return res.status(400).json({ error: 'İsim gerekli' });
         }
 
-        db.updateAccessCodeName(parseInt(id), name);
+        await db.updateAccessCodeName(parseInt(id), name);
         res.json({ success: true });
     } catch (error) {
         console.error('Kod güncelleme hatası:', error);
@@ -322,10 +323,10 @@ app.put('/api/competition/code/:id', requireAdminAuth, (req, res) => {
 });
 
 // Erişim kodunu sıfırla
-app.post('/api/competition/code/:id/reset', requireAdminAuth, (req, res) => {
+app.post('/api/competition/code/:id/reset', requireAdminAuth, async (req, res) => {
     try {
         const { id } = req.params;
-        db.resetAccessCode(parseInt(id));
+        await db.resetAccessCode(parseInt(id));
         res.json({ success: true });
     } catch (error) {
         console.error('Kod sıfırlama hatası:', error);
@@ -378,9 +379,9 @@ app.delete('/api/upload/:filename', requireAdminAuth, (req, res) => {
 // ==================== SETTINGS API ROUTES ====================
 
 // Tüm ayarları getir
-app.get('/api/settings', (req, res) => {
+app.get('/api/settings', async (req, res) => {
     try {
-        const settings = db.getAllSettings();
+        const settings = await db.getAllSettings();
         res.json(settings);
     } catch (error) {
         console.error('Ayarlar getirme hatası:', error);
@@ -389,12 +390,12 @@ app.get('/api/settings', (req, res) => {
 });
 
 // Ayar güncelle
-app.put('/api/settings/:key', requireAdminAuth, (req, res) => {
+app.put('/api/settings/:key', requireAdminAuth, async (req, res) => {
     try {
         const { key } = req.params;
         const { value } = req.body;
 
-        db.setSetting(key, value.toString());
+        await db.setSetting(key, value.toString());
         res.json({ success: true });
     } catch (error) {
         console.error('Ayar güncelleme hatası:', error);
@@ -405,18 +406,18 @@ app.put('/api/settings/:key', requireAdminAuth, (req, res) => {
 // ==================== EXISTING API ROUTES ====================
 
 // Sorular API
-app.get('/api/questions', (req, res) => {
-    res.json(db.getAllQuestions());
+app.get('/api/questions', async (req, res) => {
+    res.json(await db.getAllQuestions());
 });
 
 // Yarışmacılar API
-app.get('/api/contestants', (req, res) => {
-    res.json(db.getAllContestants());
+app.get('/api/contestants', async (req, res) => {
+    res.json(await db.getAllContestants());
 });
 
 // Liderlik Tablosu API
-app.get('/api/leaderboard', (req, res) => {
-    res.json(db.getLeaderboard());
+app.get('/api/leaderboard', async (req, res) => {
+    res.json(await db.getLeaderboard());
 });
 
 // Oyun Durumu API
