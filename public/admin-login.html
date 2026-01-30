@@ -234,7 +234,7 @@
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             // Eğer zaten giriş yapılmışsa admin paneline yönlendir
-            const token = localStorage.getItem('adminToken');
+            const token = localStorage.getItem('adminAccessToken');
             if (token) {
                 checkExistingSession(token);
             }
@@ -242,15 +242,23 @@
 
         async function checkExistingSession(token) {
             try {
-                const response = await fetch('/api/auth/check-admin', {
-                    headers: { 'X-Admin-Token': token }
+                const response = await fetch('/api/auth/verify', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
                 });
                 const data = await response.json();
-                if (data.authenticated) {
+                if (data.success && data.user.role === 'admin') {
                     window.location.href = '/admin';
+                } else {
+                    // Token invalid, clear it
+                    localStorage.removeItem('adminAccessToken');
+                    localStorage.removeItem('adminRefreshToken');
                 }
             } catch (error) {
                 console.error('Session kontrol hatası:', error);
+                localStorage.removeItem('adminAccessToken');
+                localStorage.removeItem('adminRefreshToken');
             }
         }
 
@@ -274,7 +282,7 @@
             errorMessage.classList.remove('show');
 
             try {
-                const response = await fetch('/api/auth/admin-login', {
+                const response = await fetch('/api/auth/login/admin', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ username, password })
@@ -283,8 +291,12 @@
                 const data = await response.json();
 
                 if (response.ok && data.success) {
-                    localStorage.setItem('adminToken', data.token);
-                    localStorage.setItem('adminUsername', data.username);
+                    // Store JWT tokens
+                    localStorage.setItem('adminAccessToken', data.accessToken);
+                    localStorage.setItem('adminRefreshToken', data.refreshToken);
+                    localStorage.setItem('adminUsername', data.user.username);
+                    localStorage.setItem('adminUserId', data.user.id);
+
                     window.location.href = '/admin';
                 } else {
                     showError(data.error || 'Giriş başarısız');

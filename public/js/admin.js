@@ -12,8 +12,8 @@ let timer;
 let adminToken = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
-    // Auth kontrolü
-    adminToken = localStorage.getItem('adminToken');
+    // Auth kontrolü - JWT token
+    adminToken = localStorage.getItem('adminAccessToken');
     if (!adminToken) {
         window.location.href = '/admin-login';
         return;
@@ -21,22 +21,27 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Oturum geçerliliğini kontrol et
     try {
-        const response = await fetch('/api/auth/check-admin', {
-            headers: { 'X-Admin-Token': adminToken }
+        const response = await fetch('/api/auth/verify', {
+            headers: {
+                'Authorization': `Bearer ${adminToken}`
+            }
         });
         const data = await response.json();
-        if (!data.authenticated) {
-            localStorage.removeItem('adminToken');
+        if (!data.success || data.user.role !== 'admin') {
+            localStorage.removeItem('adminAccessToken');
+            localStorage.removeItem('adminRefreshToken');
             window.location.href = '/admin-login';
             return;
         }
         // Admin bilgilerini göster
         const userDisplay = document.getElementById('adminUsername');
         if (userDisplay) {
-            userDisplay.textContent = data.username;
+            userDisplay.textContent = data.user.username;
         }
     } catch (error) {
         console.error('Auth kontrol hatası:', error);
+        localStorage.removeItem('adminAccessToken');
+        localStorage.removeItem('adminRefreshToken');
         window.location.href = '/admin-login';
         return;
     }

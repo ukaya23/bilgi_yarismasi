@@ -17,14 +17,31 @@ class SocketManager {
     }
 
     init() {
+        // JWT token al (eğer varsa)
+        let token = null;
+        if (this.role === 'admin') {
+            token = localStorage.getItem('adminAccessToken');
+        } else if (this.role === 'player') {
+            token = localStorage.getItem('playerAccessToken');
+        } else if (this.role === 'jury') {
+            token = localStorage.getItem('juryAccessToken');
+        }
+
         // Socket.io bağlantısı
-        this.socket = io({
+        const socketConfig = {
             reconnection: true,
             reconnectionAttempts: this.maxReconnectAttempts,
             reconnectionDelay: 1000,
             reconnectionDelayMax: 5000,
             timeout: 20000
-        });
+        };
+
+        // JWT token varsa auth objesine ekle
+        if (token) {
+            socketConfig.auth = { token };
+        }
+
+        this.socket = io(socketConfig);
 
         // Bağlantı olayları
         this.socket.on('connect', () => {
@@ -33,8 +50,10 @@ class SocketManager {
             this.isConnected = true;
             this.hideConnectionOverlay();
 
-            // Role katıl
-            this.socket.emit('JOIN_ROOM', { role: this.role });
+            // JWT yoksa legacy JOIN_ROOM kullan
+            if (!token) {
+                this.socket.emit('JOIN_ROOM', { role: this.role });
+            }
 
             // Yeniden bağlantı durumunda callback çağır
             if (wasConnected && this.onReconnectCallback) {

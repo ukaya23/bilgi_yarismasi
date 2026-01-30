@@ -12,7 +12,8 @@
 const db = require('../../database/postgres');
 
 class GameState {
-    constructor() {
+    constructor(competitionId = 1) {
+        this.competitionId = competitionId;
         this.state = 'IDLE';
         this.currentQuestion = null;
         this.questionStartTime = null;
@@ -23,7 +24,7 @@ class GameState {
         this.currentRevealStep = 0; // Reveal adımı
         this.io = null;
 
-        // Singleton instance'ı sakla
+        // Singleton instance'ı sakla (backward compatibility için)
         GameState.instance = this;
     }
 
@@ -39,6 +40,7 @@ class GameState {
      */
     getState() {
         return {
+            competitionId: this.competitionId,
             state: this.state,
             currentQuestion: this.currentQuestion,
             timeRemaining: this.timeRemaining,
@@ -506,7 +508,9 @@ class GameState {
     }
 }
 
-// Singleton instance
-const gameState = new GameState();
+// Singleton instance for backward compatibility
+const gameStateInstance = new GameState();
 
-module.exports = gameState;
+// Export both the class and singleton instance
+module.exports = gameStateInstance;
+module.exports.GameState = GameState;

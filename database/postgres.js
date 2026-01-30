@@ -145,17 +145,44 @@ class PostgresDatabase {
     }
 
     /**
-     * Yarışmacı ekle veya güncelle (masa numarasına göre)
+     * ID'ye göre yarışmacı getir
      */
-    async upsertContestant(name, tableNo) {
-        const result = await this.pool.query(`
-            INSERT INTO contestants (name, table_no, status)
-            VALUES ($1, $2, 'ONLINE')
-            ON CONFLICT (table_no)
-            DO UPDATE SET name = EXCLUDED.name, status = 'ONLINE'
-            RETURNING id
-        `, [name, tableNo]);
-        return result.rows[0].id;
+    async getContestantById(id) {
+        const result = await this.pool.query(
+            'SELECT * FROM contestants WHERE id = $1',
+            [id]
+        );
+        return result.rows[0] || null;
+    }
+
+    /**
+     * Yarışmacı ekle veya güncelle (masa numarasına göre, yarışma bazlı)
+     */
+    async upsertContestant(name, tableNo, competitionId = 1) {
+        // First check for unique constraint on table_no + competition_id
+        const existing = await this.pool.query(`
+            SELECT id FROM contestants
+            WHERE table_no = $1 AND competition_id = $2
+        `, [tableNo, competitionId]);
+
+        if (existing.rows.length > 0) {
+            // Update existing contestant
+            const result = await this.pool.query(`
+                UPDATE contestants
+                SET name = $1, status = 'ONLINE'
+                WHERE table_no = $2 AND competition_id = $3
+                RETURNING id
+            `, [name, tableNo, competitionId]);
+            return result.rows[0].id;
+        } else {
+            // Insert new contestant
+            const result = await this.pool.query(`
+                INSERT INTO contestants (name, table_no, competition_id, status)
+                VALUES ($1, $2, $3, 'ONLINE')
+                RETURNING id
+            `, [name, tableNo, competitionId]);
+            return result.rows[0].id;
+        }
     }
 
     /**
@@ -466,6 +493,17 @@ class PostgresDatabase {
     }
 
     /**
+     * Kullanıcı adına göre admin kullanıcı getir
+     */
+    async getAdminByUsername(username) {
+        const result = await this.pool.query(
+            'SELECT id, username, password_hash FROM admin_users WHERE username = $1',
+            [username]
+        );
+        return result.rows[0] || null;
+    }
+
+    /**
      * Admin kimlik doğrulama
      */
     async authenticateAdmin(username, password) {
@@ -513,6 +551,39 @@ class PostgresDatabase {
     }
 
     /**
+     * Tüm aktif yarışmaları getir
+     */
+    async getActiveCompetitions() {
+        const result = await this.pool.query(
+            "SELECT * FROM competitions WHERE status = 'ACTIVE' ORDER BY created_at DESC"
+        );
+        return result.rows;
+    }
+
+    /**
+     * ID'ye göre yarışma getir
+     */
+    async getCompetitionById(id) {
+        const result = await this.pool.query(
+            'SELECT * FROM competitions WHERE id = $1',
+            [id]
+        );
+        return result.rows[0] || null;
+    }
+
+    /**
+     * Yarışma bilgilerini güncelle
+     */
+    async updateCompetition(id, updates) {
+        const { name, status } = updates;
+        const result = await this.pool.query(
+            'UPDATE competitions SET name = COALESCE($1, name), status = COALESCE($2, status) WHERE id = $3',
+            [name, status, id]
+        );
+        return result.rowCount;
+    }
+
+    /**
      * Yarışma durumunu güncelle
      */
     async updateCompetitionStatus(id, status) {
@@ -521,6 +592,32 @@ class PostgresDatabase {
             [status, id]
         );
         return result.rowCount;
+    }
+
+    /**
+     * Yarışmaya kayıtlı yarışmacıları getir
+     */
+    async getContestantsByCompetition(competitionId) {
+        const result = await this.pool.query(`
+            SELECT id, name, table_no, total_score, status, socket_id
+            FROM contestants
+            WHERE competition_id = $1
+            ORDER BY table_no
+        `, [competitionId]);
+        return result.rows;
+    }
+
+    /**
+     * Yarışma sıralamasını getir
+     */
+    async getLeaderboardByCompetition(competitionId) {
+        const result = await this.pool.query(`
+            SELECT id, name, table_no, total_score
+            FROM contestants
+            WHERE competition_id = $1
+            ORDER BY total_score DESC, name ASC
+        `, [competitionId]);
+        return result.rows;
     }
 
     // ==================== ERİŞİM KODU İŞLEMLERİ ====================
@@ -613,6 +710,58 @@ class PostgresDatabase {
             [competitionId]
         );
         return result.rows;
+    }
+
+    // ==================== JWT TOKEN İŞLEMLERİ ====================
+
+    /**
+     * Token'ı iptal edilmiş listesine ekle
+     */
+    async revokeToken(tokenId, userId, reason = 'manual_revoke') {
+        const result = await this.pool.query(`
+            INSERT INTO revoked_tokens (token_id, user_id, reason)
+            VALUES ($1, $2, $3)
+            ON CONFLICT (token_id) DO NOTHING
+            RETURNING *
+        `, [tokenId, userId, reason]);
+        return result.rows[0];
+    }
+
+    /**
+     * Token'ın iptal edilip edilmediğini kontrol et
+     */
+    async isTokenRevoked(tokenId) {
+        const result = await this.pool.query(
+            'SELECT EXISTS(SELECT 1 FROM revoked_tokens WHERE token_id = $1) as revoked',
+            [tokenId]
+        );
+        return result.rows[0].revoked;
+    }
+
+    /**
+     * Kullanıcının tüm token'larını iptal et
+     */
+    async revokeAllUserTokens(userId, reason = 'logout_all') {
+        const result = await this.pool.query(`
+            INSERT INTO revoked_tokens (token_id, user_id, reason)
+            SELECT gen_random_uuid(), $1, $2
+            WHERE NOT EXISTS (
+                SELECT 1 FROM revoked_tokens WHERE user_id = $1
+            )
+            RETURNING *
+        `, [userId, reason]);
+        return result.rowCount;
+    }
+
+    /**
+     * Eski iptal edilmiş token'ları temizle (7 günden eski)
+     */
+    async cleanupRevokedTokens() {
+        const result = await this.pool.query(`
+            DELETE FROM revoked_tokens
+            WHERE revoked_at < NOW() - INTERVAL '7 days'
+        `);
+        return result.rowCount;
     }
 }
 

@@ -44,6 +44,7 @@ const upload = multer({
 // Veritabanı ve State
 const db = require('./database/postgres');
 const gameState = require('./src/state/gameState');
+const competitionManager = require('./src/state/competitionManager');
 
 // Event Handler'lar
 const { registerAdminHandlers } = require('./src/handlers/adminHandler');
@@ -116,7 +117,15 @@ app.get('/screen', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'screen.html'));
 });
 
-// ==================== AUTH API ROUTES ====================
+// ==================== JWT AUTH ROUTES ====================
+const authRoutes = require('./src/routes/authRoutes');
+app.use('/api/auth', authRoutes);
+
+// ==================== COMPETITION ROUTES ====================
+const competitionRoutes = require('./src/routes/competitionRoutes');
+app.use('/api/competitions', competitionRoutes);
+
+// ==================== AUTH API ROUTES (LEGACY - will be deprecated) ====================
 
 // Admin Login
 app.post('/api/auth/admin-login', async (req, res) => {
@@ -426,12 +435,46 @@ app.get('/api/state', (req, res) => {
 
 // ==================== SOCKET.IO ====================
 
-io.on('connection', (socket) => {
-    console.log(`[SOCKET] Yeni bağlantı: ${socket.id}`);
+// JWT Auth Middleware (optional - allows both authenticated and legacy connections)
+const { optionalSocketAuth } = require('./src/auth/socketAuth');
+io.use(optionalSocketAuth);
 
-    // Rol belirleme
+io.on('connection', (socket) => {
+    console.log(`[SOCKET] Yeni bağlantı: ${socket.id}`, socket.role ? `(${socket.role})` : '(unauthenticated)');
+
+    // JWT-based automatic role assignment
+    if (socket.role) {
+        const competitionId = socket.competitionId || 1; // Default to competition 1
+        console.log(`[SOCKET] JWT authenticated: ${socket.username} as ${socket.role} for competition ${competitionId}`);
+
+        // Join competition-specific room
+        const roomName = `${socket.role}-${competitionId}`;
+        socket.join(roomName);
+        console.log(`[SOCKET] Joined room: ${roomName}`);
+
+        // Store competition ID on socket
+        socket.competitionId = competitionId;
+
+        switch (socket.role) {
+            case 'admin':
+                registerAdminHandlers(io, socket);
+                break;
+            case 'player':
+                registerPlayerHandlers(io, socket);
+                break;
+            case 'jury':
+                registerJuryHandlers(io, socket);
+                break;
+            case 'screen':
+                registerScreenHandlers(io, socket);
+                break;
+        }
+    }
+
+    // Legacy: Rol belirleme (JOIN_ROOM - backward compatibility)
     socket.on('JOIN_ROOM', (data) => {
         const { role } = data;
+        console.log(`[SOCKET] Legacy JOIN_ROOM: ${role}`);
 
         switch (role) {
             case 'admin':
@@ -470,7 +513,10 @@ async function startServer() {
         // Varsayılan admin kullanıcısını oluştur
         await db.ensureDefaultAdmin();
 
-        // GameState'e io referansını ver
+        // CompetitionManager'ı initialize et
+        competitionManager.setIO(io);
+
+        // GameState'e io referansını ver (backward compatibility)
         gameState.setIO(io);
 
         // HTTP sunucusunu başlat
