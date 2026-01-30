@@ -63,6 +63,12 @@ async function registerAdminHandlers(io, socket) {
     // Oyunu sıfırla
     socket.on('ADMIN_RESET_GAME', async () => {
         try {
+            // Aktif yarışmayı bul ve kodları sıfırla
+            const activeCompetition = await db.getActiveCompetition();
+            if (activeCompetition) {
+                await db.resetAllAccessCodes(activeCompetition.id);
+            }
+
             await gameState.resetGame();
             socket.emit('ACTION_RESULT', { success: true, action: 'RESET_GAME' });
         } catch (error) {
