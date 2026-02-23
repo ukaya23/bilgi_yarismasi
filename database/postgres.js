@@ -249,8 +249,19 @@ class PostgresDatabase {
         const client = await this.pool.connect();
         try {
             await client.query('BEGIN');
-            // TRUNCATE is faster and resets auto-increment IDs. CASCADE cleans up answers too.
-            await client.query('TRUNCATE TABLE contestants, answers RESTART IDENTITY CASCADE');
+            // TRUNCATE yerine yetki ve lock sorunlarını önlemek adına DELETE kullanıyoruz
+            await client.query('DELETE FROM answers');
+            await client.query('DELETE FROM contestants');
+
+            // Opsiyonel: ID'leri sıfırlamaya çalış
+            try {
+                await client.query('ALTER SEQUENCE answers_id_seq RESTART WITH 1');
+                await client.query('ALTER SEQUENCE contestants_id_seq RESTART WITH 1');
+            } catch (seqError) {
+                // Ignore sequence reset errors
+                console.log('[DB] Sequence reset atlanıyor (yetki veya SQLite):', seqError.message);
+            }
+
             await client.query('COMMIT');
         } catch (error) {
             await client.query('ROLLBACK');

@@ -283,16 +283,18 @@
                     </div>
 
                     <div id="optionsContainer">
-                        <div class="form-group">
-                            <label class="form-label">Şıklar (Her satıra bir şık)</label>
-                            <textarea class="form-control" id="questionOptions" rows="4"
-                                placeholder="A şıkkı&#10;B şıkkı&#10;C şıkkı&#10;D şıkkı"></textarea>
+                        <label class="form-label">Şıklar <small class="text-muted">(Doğru cevabı yandaki yuvarlaktan seçin)</small></label>
+                        <div id="dynamicOptionsList">
+                            <!-- JS ile doldurulacak -->
                         </div>
+                        <button type="button" class="btn btn-sm btn-secondary mt-2" id="addOptionBtn">
+                            ➕ Şık Ekle
+                        </button>
                     </div>
 
-                    <div class="form-group">
+                    <div class="form-group hidden" id="openEndedAnswerContainer">
                         <label class="form-label">Doğru Cevap(lar) (Her satıra bir)</label>
-                        <textarea class="form-control" id="questionCorrectKeys" rows="2" required
+                        <textarea class="form-control" id="questionCorrectKeys" rows="2"
                             placeholder="Doğru cevap"></textarea>
                     </div>
 

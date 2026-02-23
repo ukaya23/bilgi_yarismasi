@@ -75,14 +75,41 @@ const adminSessions = new Map();
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 
+const { verifyToken } = require('./src/auth/jwtUtils');
+
 // Admin oturum kontrolü middleware
 function requireAdminAuth(req, res, next) {
-    const token = req.headers['x-admin-token'];
-    if (!token || !adminSessions.has(token)) {
-        return res.status(401).json({ error: 'Yetkisiz erişim' });
+    console.log('[AUTH DEBUG] requireAdminAuth called for URL:', req.originalUrl || req.url);
+
+    // Frontend X-Admin-Token üzerinden gönderiyor
+    const token = req.headers['x-admin-token'] || (req.headers.authorization && req.headers.authorization.split(' ')[1]);
+
+    console.log('[AUTH DEBUG] Extracted Token:', token ? token.substring(0, 15) + '...' : 'NULL OR UNDEFINED');
+
+    if (!token) {
+        console.log('[AUTH DEBUG] No token provided in headers!');
+        return res.status(401).json({ error: 'Yetkisiz erişim - Token yok' });
     }
-    req.admin = adminSessions.get(token);
-    next();
+
+    try {
+        const decoded = verifyToken(token);
+        if (decoded.role !== 'admin') {
+            console.log('[AUTH DEBUG] Token valid but role is not admin:', decoded.role);
+            return res.status(403).json({ error: 'Yetkisiz erişim: Yönetici rolü gerekli' });
+        }
+        req.admin = { id: decoded.userId, username: decoded.username };
+        console.log('[AUTH DEBUG] Success for user:', req.admin.username);
+        next();
+    } catch (error) {
+        console.error('[AUTH DEBUG] JWT verification failed:', error.message);
+        // Eski memory map üzerinden fallback (gerekliyse)
+        if (adminSessions && adminSessions.has(token)) {
+            req.admin = adminSessions.get(token);
+            console.log('[AUTH DEBUG] Fallback to memory session success for:', req.admin.username);
+            return next();
+        }
+        return res.status(401).json({ error: 'Oturum süresi dolmuş veya geçersiz token' });
+    }
 }
 
 // ==================== ROUTES ====================

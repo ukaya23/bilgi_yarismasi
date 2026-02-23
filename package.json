@@ -4,8 +4,8 @@
   "description": "LAN Tabanlı Gerçek Zamanlı Bilgi Yarışması Sistemi",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node --watch server.js"
+    "start": "echo \"Lütfen projeyi Docker ile çalıştırın: docker-compose up -d\" && exit 1",
+    "dev": "echo \"Lütfen projeyi Docker ile çalıştırın: docker-compose up -d\" && exit 1"
   },
   "keywords": [
     "quiz",

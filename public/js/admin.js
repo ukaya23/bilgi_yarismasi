@@ -324,16 +324,27 @@ function updateQuestionsUI() {
 
     questions.forEach(q => {
         const tr = document.createElement('tr');
+
+        let typeHtml = '';
+        if (q.type === 'MULTIPLE_CHOICE') {
+            const optCount = q.options ? JSON.parse(q.options).length : 0;
+            typeHtml = `<span class="badge badge-primary">Çoktan Seçmeli (${optCount} Şık)</span>`;
+        } else {
+            typeHtml = `<span class="badge badge-warning">Açık Uçlu</span>`;
+        }
+
+        const hasImage = q.media_url ? '<span title="Görsel İçerir">🖼️</span> ' : '';
+
         tr.innerHTML = `
             <td>${q.id}</td>
             <td>${q.category || '-'}</td>
-            <td>${truncate(q.content, 50)}</td>
-            <td><span class="badge ${q.type === 'MULTIPLE_CHOICE' ? 'badge-primary' : 'badge-warning'}">${q.type === 'MULTIPLE_CHOICE' ? 'Çoktan Seçmeli' : 'Açık Uçlu'}</span></td>
+            <td>${hasImage}${truncate(q.content, 50)}</td>
+            <td>${typeHtml}</td>
             <td>${q.points}</td>
             <td>${q.duration}s</td>
             <td class="action-btns">
-                <button class="btn btn-sm btn-secondary" onclick="editQuestion(${q.id})">✏️</button>
-                <button class="btn btn-sm btn-danger" onclick="deleteQuestion(${q.id})">🗑️</button>
+                <button class="btn btn-sm btn-secondary" onclick="editQuestion(${q.id})" title="Düzenle">✏️</button>
+                <button class="btn btn-sm btn-danger" onclick="deleteQuestion(${q.id})" title="Sil">🗑️</button>
             </td>
         `;
         tbody.appendChild(tr);
@@ -466,6 +477,10 @@ function openQuestionModal(question = null) {
     // Şıklar görünürlüğü
     const type = document.getElementById('questionType').value;
     document.getElementById('optionsContainer').style.display = type === 'MULTIPLE_CHOICE' ? 'block' : 'none';
+    document.getElementById('openEndedAnswerContainer').style.display = type === 'OPEN_ENDED' ? 'block' : 'none';
+
+    // Dinamik şıkları yükle
+    renderDynamicOptions(question ? JSON.parse(question.options || '[]') : [], question ? JSON.parse(question.correct_keys || '[]') : []);
 
     // Resim önizleme (düzenleme modunda)
     if (question && question.media_url) {
@@ -486,13 +501,44 @@ function saveQuestion() {
     const content = document.getElementById('questionContent').value;
     const category = document.getElementById('questionCategory').value;
     const type = document.getElementById('questionType').value;
-    const options = document.getElementById('questionOptions').value.split('\n').filter(o => o.trim());
-    const correctKeys = document.getElementById('questionCorrectKeys').value.split('\n').filter(k => k.trim());
     const points = parseInt(document.getElementById('questionPoints').value);
     const duration = parseInt(document.getElementById('questionDuration').value);
 
-    if (!content || !correctKeys.length) {
-        showToast('Soru metni ve doğru cevap zorunludur', 'error');
+    let options = [];
+    let correctKeys = [];
+
+    if (type === 'MULTIPLE_CHOICE') {
+        const optionItems = document.querySelectorAll('.dynamic-option-item');
+        optionItems.forEach(item => {
+            const input = item.querySelector('input[type="text"]');
+            const radio = item.querySelector('input[type="radio"]');
+            const val = input.value.trim();
+            if (val) {
+                options.push(val);
+                if (radio.checked) {
+                    correctKeys.push(val);
+                }
+            }
+        });
+
+        if (options.length < 2) {
+            showToast('En az 2 şık eklemelisiniz', 'error');
+            return;
+        }
+        if (correctKeys.length === 0) {
+            showToast('Lütfen doğru cevabı seçin', 'error');
+            return;
+        }
+    } else { // OPEN_ENDED
+        correctKeys = document.getElementById('questionCorrectKeys').value.split('\n').filter(k => k.trim());
+        if (correctKeys.length === 0) {
+            showToast('Doğru cevap zorunludur', 'error');
+            return;
+        }
+    }
+
+    if (!content) {
+        showToast('Soru metni zorunludur', 'error');
         return;
     }
 
@@ -531,6 +577,74 @@ function deleteQuestion(id) {
     if (confirm('Bu soruyu silmek istediğinize emin misiniz?')) {
         socketManager.emit('ADMIN_DELETE_QUESTION', { id });
     }
+}
+
+// ==================== DYNAMIC OPTIONS HELPERS ====================
+
+function renderDynamicOptions(options = [], correctKeys = []) {
+    const list = document.getElementById('dynamicOptionsList');
+    list.innerHTML = '';
+
+    if (options.length === 0) {
+        // Default 2 options if empty
+        list.appendChild(createDynamicOptionItem('', false));
+        list.appendChild(createDynamicOptionItem('', false));
+    } else {
+        options.forEach(opt => {
+            const isCorrect = correctKeys.includes(opt);
+            list.appendChild(createDynamicOptionItem(opt, isCorrect));
+        });
+    }
+    updateOptionEvents();
+}
+
+function createDynamicOptionItem(value = '', isCorrect = false) {
+    const div = document.createElement('div');
+    div.className = 'dynamic-option-item';
+    if (isCorrect) div.classList.add('correct');
+
+    div.innerHTML = `
+        <input type="radio" name="correctOptionRadio" ${isCorrect ? 'checked' : ''} title="Doğru Cevabı Seç">
+        <input type="text" placeholder="Şık Metni..." value="${value.replace(/"/g, '&quot;')}">
+        <button type="button" class="remove-option-btn" title="Şıkkı Kaldır">&times;</button>
+    `;
+
+    return div;
+}
+
+function updateOptionEvents() {
+    const list = document.getElementById('dynamicOptionsList');
+    const items = list.querySelectorAll('.dynamic-option-item');
+
+    items.forEach(item => {
+        const radio = item.querySelector('input[type="radio"]');
+        const removeBtn = item.querySelector('.remove-option-btn');
+
+        // Remove old listeners to prevent duplicates if called multiple times (lazy approach via clone)
+        const newRadio = radio.cloneNode(true);
+        radio.parentNode.replaceChild(newRadio, radio);
+
+        const newRemoveBtn = removeBtn.cloneNode(true);
+        removeBtn.parentNode.replaceChild(newRemoveBtn, removeBtn);
+
+        // Selection Event
+        newRadio.addEventListener('change', () => {
+            // Remove 'correct' class from all options
+            items.forEach(i => i.classList.remove('correct'));
+            // Add to selected
+            if (newRadio.checked) item.classList.add('correct');
+        });
+
+        // Delete Event
+        newRemoveBtn.addEventListener('click', () => {
+            const currentItems = list.querySelectorAll('.dynamic-option-item');
+            if (currentItems.length <= 2) {
+                showToast('En az 2 şık bulunmalıdır', 'warning');
+                return;
+            }
+            item.remove();
+        });
+    });
 }
 
 // ==================== COMPETITION MANAGEMENT ====================
@@ -624,14 +738,25 @@ async function createCompetition() {
     }
 
     try {
+        const currentToken = localStorage.getItem('adminAccessToken') || localStorage.getItem('adminToken') || adminToken;
         const response = await fetch('/api/competition', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-Admin-Token': adminToken
+                'X-Admin-Token': currentToken
             },
             body: JSON.stringify({ name, contestantCount, juryCount })
         });
+
+        if (response.status === 401) {
+            showToast('Oturumunuz süresi dolmuş. Giriş sayfasına yönlendiriliyorsunuz.', 'error');
+            setTimeout(() => {
+                localStorage.removeItem('adminToken');
+                localStorage.removeItem('adminAccessToken');
+                window.location.href = '/admin-login';
+            }, 2000);
+            return;
+        }
 
         const data = await response.json();
 
@@ -682,10 +807,21 @@ async function endCompetition() {
     if (!confirm('Yarışmayı sonlandırmak istediğinize emin misiniz?')) return;
 
     try {
+        const currentToken = localStorage.getItem('adminAccessToken') || localStorage.getItem('adminToken');
         const response = await fetch('/api/competition/end', {
             method: 'POST',
-            headers: { 'X-Admin-Token': adminToken }
+            headers: { 'X-Admin-Token': currentToken }
         });
+
+        if (response.status === 401) {
+            showToast('Oturumunuz süresi dolmuş. Giriş sayfasına yönlendiriliyorsunuz.', 'error');
+            setTimeout(() => {
+                localStorage.removeItem('adminToken');
+                localStorage.removeItem('adminAccessToken');
+                window.location.href = '/admin-login';
+            }, 2000);
+            return;
+        }
 
         const data = await response.json();
 
@@ -701,11 +837,11 @@ async function endCompetition() {
 
             showToast('Yarışma sonlandırıldı', 'success');
         } else {
-            showToast('Yarışma sonlandırılamadı', 'error');
+            showToast('Yarışma sonlandırılamadı: ' + (data.error || 'Bilinmeyen hata'), 'error');
         }
     } catch (error) {
         console.error('Yarışma sonlandırma hatası:', error);
-        showToast('Sunucu hatası', 'error');
+        showToast('Sunucu bağlantı hatası', 'error');
     }
 }
 
@@ -879,10 +1015,12 @@ async function handleImageSelect(e) {
         const formData = new FormData();
         formData.append('image', file);
 
+        const currentToken = localStorage.getItem('adminAccessToken') || localStorage.getItem('adminToken') || adminToken;
+
         const response = await fetch('/api/upload', {
             method: 'POST',
             headers: {
-                'X-Admin-Token': adminToken
+                'X-Admin-Token': currentToken
             },
             body: formData
         });
@@ -947,9 +1085,10 @@ async function removeImage() {
         // Sunucudan sil
         const filename = mediaUrl.split('/').pop();
         try {
+            const currentToken = localStorage.getItem('adminAccessToken') || localStorage.getItem('adminToken') || adminToken;
             await fetch(`/api/upload/${filename}`, {
                 method: 'DELETE',
-                headers: { 'X-Admin-Token': adminToken }
+                headers: { 'X-Admin-Token': currentToken }
             });
         } catch (error) {
             console.error('Resim silme hatası:', error);
