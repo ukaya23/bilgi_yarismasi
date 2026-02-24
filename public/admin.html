@@ -80,14 +80,31 @@
                 <div class="card mt-3">
                     <div class="card-header">
                         <h3 class="card-title">⚡ Hızlı Kontroller</h3>
+                        <span class="badge badge-info" id="questionProgress">0/0 Soru</span>
                     </div>
                     <div class="quick-actions">
+                        <!-- Soru Seçimi -->
                         <div class="form-group">
                             <label class="form-label">Sıradaki Soru</label>
                             <select class="form-control" id="questionSelect">
                                 <option value="">Soru Seçin...</option>
                             </select>
                         </div>
+
+                        <!-- Ana Akış Butonları -->
+                        <div class="flow-buttons">
+                            <button class="btn btn-success btn-lg flow-btn" id="startQuestionBtn" disabled>
+                                <span class="btn-icon">▶️</span> Soruyu Başlat
+                            </button>
+                            <button class="btn btn-warning btn-lg flow-btn" id="skipToGradingBtn" disabled>
+                                <span class="btn-icon">⏭️</span> Süreyi Bitir
+                            </button>
+                            <button class="btn btn-primary btn-lg flow-btn" id="showResultsBtn" disabled>
+                                <span class="btn-icon">📊</span> Sonuçları Göster
+                            </button>
+                        </div>
+
+                        <!-- Ekran Adım Kontrolü (Manuel mod) -->
                         <div class="form-group hidden" id="stepControlGroup">
                             <label class="form-label">
                                 Ekran Adımı: <span id="currentStepName" class="badge badge-info">-</span>
@@ -98,22 +115,13 @@
                             </button>
                         </div>
 
-                        <div class="action-buttons">
-                            <button class="btn btn-success btn-lg" id="startQuestionBtn" disabled>
-                                ▶️ Soruyu Başlat
+                        <!-- Yardımcı Butonlar -->
+                        <div class="secondary-buttons">
+                            <button class="btn btn-secondary" id="goIdleBtn" disabled>
+                                <span class="btn-icon">⏸️</span> Beklemeye Al
                             </button>
-                            <button class="btn btn-secondary btn-lg" id="skipToGradingBtn" disabled>
-                                ⏭️ Süreyi Bitir
-                            </button>
-                            <button class="btn btn-primary btn-lg" id="showResultsBtn" disabled>
-                                📊 Sonuçları Göster
-                            </button>
-                            <button class="btn btn-secondary btn-lg" id="goIdleBtn" disabled>
-                                ⏸️ Beklemeye Al
-                            </button>
-                            <button class="btn btn-warning btn-lg" id="resetGameBtn">
-                                <span class="btn-icon">🔄</span>
-                                Oyunu Sıfırla
+                            <button class="btn btn-danger-outline" id="resetGameBtn">
+                                <span class="btn-icon">🔄</span> Oyunu Sıfırla
                             </button>
                         </div>
                     </div>
@@ -283,7 +291,8 @@
                     </div>
 
                     <div id="optionsContainer">
-                        <label class="form-label">Şıklar <small class="text-muted">(Doğru cevabı yandaki yuvarlaktan seçin)</small></label>
+                        <label class="form-label">Şıklar <small class="text-muted">(Doğru cevabı yandaki yuvarlaktan
+                                seçin)</small></label>
                         <div id="dynamicOptionsList">
                             <!-- JS ile doldurulacak -->
                         </div>

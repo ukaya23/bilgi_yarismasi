@@ -16,7 +16,8 @@ async function registerAdminHandlers(io, socket) {
         questions: await db.getAllQuestions(),
         contestants: await db.getAllContestants(),
         gameState: gameState.getState(),
-        leaderboard: await db.getLeaderboard()
+        leaderboard: await db.getLeaderboard(),
+        askedQuestionIds: await db.getAskedQuestionIds()
     });
 
     // Soru başlat

@@ -2,11 +2,12 @@
  * Admin Panel JavaScript
  */
 
-// ==================== INITIALIZATION ====================
+// ==================== STATE ====================
 
 let socketManager;
 let questions = [];
 let contestants = [];
+let askedQuestionIds = new Set();
 let currentGameState = 'IDLE';
 let timer;
 let adminToken = null;
@@ -153,6 +154,11 @@ function setupSocketEvents() {
         console.log('[ADMIN] Init data:', data);
         questions = data.questions;
         contestants = data.contestants;
+
+        // Sorulan soruları takip et
+        if (data.askedQuestionIds) {
+            askedQuestionIds = new Set(data.askedQuestionIds);
+        }
 
         updateQuestionsUI();
         updateContestantsUI();
@@ -334,12 +340,32 @@ function updateQuestionsUI() {
     const select = document.getElementById('questionSelect');
     select.innerHTML = '<option value="">Soru Seçin...</option>';
 
+    let askedCount = 0;
     questions.forEach(q => {
         const option = document.createElement('option');
         option.value = q.id;
-        option.textContent = `#${q.id} - ${q.category || 'Genel'}: ${truncate(q.content, 40)}`;
+        const isAsked = askedQuestionIds.has(q.id);
+        if (isAsked) {
+            askedCount++;
+            option.textContent = `✓ #${q.id} - ${q.category || 'Genel'}: ${truncate(q.content, 40)}`;
+            option.disabled = true;
+            option.style.color = '#666';
+        } else {
+            option.textContent = `#${q.id} - ${q.category || 'Genel'}: ${truncate(q.content, 40)}`;
+        }
         select.appendChild(option);
     });
+
+    // İlerleme göstergesi güncelle
+    const progressEl = document.getElementById('questionProgress');
+    if (progressEl) {
+        progressEl.textContent = `${askedCount}/${questions.length} Soru`;
+        if (askedCount === questions.length && questions.length > 0) {
+            progressEl.className = 'badge badge-success';
+        } else {
+            progressEl.className = 'badge badge-info';
+        }
+    }
 
     // Tablo güncelle
     const tbody = document.getElementById('questionsTableBody');
@@ -453,6 +479,10 @@ function startQuestion() {
     if (!questionId) return;
 
     socketManager.emit('ADMIN_START_QUESTION', { questionId: parseInt(questionId) });
+
+    // Soruyu sorulanlar listesine ekle ve dropdown'ı güncelle
+    askedQuestionIds.add(parseInt(questionId));
+    updateQuestionsUI();
 }
 
 function skipToGrading() {

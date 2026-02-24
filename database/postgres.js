@@ -335,6 +335,16 @@ class PostgresDatabase {
     }
 
     /**
+     * Daha önce sorulmuş soru ID'lerini getir
+     */
+    async getAskedQuestionIds() {
+        const result = await this.pool.query(
+            'SELECT DISTINCT question_id FROM answers'
+        );
+        return result.rows.map(r => r.question_id);
+    }
+
+    /**
      * Cevabı puanla
      */
     async gradeAnswer(answerId, isCorrect, points) {
