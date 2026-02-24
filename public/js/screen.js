@@ -398,8 +398,15 @@ function setupSocketEvents() {
         showQuote(data);
     });
 
+    socketManager.on('SHOW_PODIUM', (data) => {
+        showPodiumScreen(data.leaderboard);
+    });
+
     socketManager.on('GAME_RESET', () => {
         showScreen('idleScreen');
+        // Clear podium if it was active
+        const podiumContainer = document.getElementById('podiumContainer');
+        if (podiumContainer) podiumContainer.innerHTML = ''; // or reset logic
     });
 }
 
@@ -596,3 +603,101 @@ setInterval(() => {
         socketManager.emit('SCREEN_REQUEST_QUOTE');
     }
 }, 30000);
+
+// ==================== PODIUM SCREEN ====================
+function showPodiumScreen(leaderboard) {
+    showScreen('podiumScreen');
+
+    // reset bars
+    const bars = document.querySelectorAll('.podium-bar');
+    bars.forEach(bar => bar.style.height = '0');
+
+    const p1 = leaderboard[0];
+    const p2 = leaderboard[1];
+    const p3 = leaderboard[2];
+
+    // Set text
+    if (p1) {
+        document.getElementById('podiumName1').textContent = p1.name;
+        document.getElementById('podiumScore1').textContent = p1.total_score;
+        document.getElementById('podium1').classList.remove('hidden');
+    } else {
+        document.getElementById('podium1').classList.add('hidden');
+    }
+
+    if (p2) {
+        document.getElementById('podiumName2').textContent = p2.name;
+        document.getElementById('podiumScore2').textContent = p2.total_score;
+        document.getElementById('podium2').classList.remove('hidden');
+    } else {
+        document.getElementById('podium2').classList.add('hidden');
+    }
+
+    if (p3) {
+        document.getElementById('podiumName3').textContent = p3.name;
+        document.getElementById('podiumScore3').textContent = p3.total_score;
+        document.getElementById('podium3').classList.remove('hidden');
+    } else {
+        document.getElementById('podium3').classList.add('hidden');
+    }
+
+    // Animate bars
+    setTimeout(() => {
+        if (p3) document.querySelector('.place-3 .podium-bar').style.height = '15vh';
+        if (p2) document.querySelector('.place-2 .podium-bar').style.height = '25vh';
+        if (p1) document.querySelector('.place-1 .podium-bar').style.height = '35vh';
+        if (typeof soundManager !== 'undefined') soundManager.playResults();
+
+        startConfetti();
+    }, 500);
+}
+
+// Simple Confetti logic
+let confettiCtx = null;
+let confettiParticles = [];
+function startConfetti() {
+    const canvas = document.getElementById('confettiCanvas');
+    if (!canvas) return;
+    confettiCtx = canvas.getContext('2d');
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    confettiParticles = [];
+    for (let i = 0; i < 150; i++) {
+        confettiParticles.push({
+            x: Math.random() * canvas.width,
+            y: Math.random() * canvas.height - canvas.height,
+            r: Math.random() * 6 + 4,
+            dx: Math.random() * 4 - 2,
+            dy: Math.random() * 5 + 2,
+            color: `hsl(${Math.random() * 360}, 100%, 50%)`,
+            tilt: Math.random() * 10 - 10,
+            tiltAngle: 0,
+            tiltAngleInc: (Math.random() * 0.07) + 0.05
+        });
+    }
+    requestAnimationFrame(renderConfetti);
+}
+
+function renderConfetti() {
+    if (!confettiCtx) return;
+    confettiCtx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+    let active = false;
+    for (let i = 0; i < confettiParticles.length; i++) {
+        let p = confettiParticles[i];
+        p.tiltAngle += p.tiltAngleInc;
+        p.y += p.dy;
+        p.x += Math.sin(p.tiltAngle) * 2;
+        p.tilt = Math.sin(p.tiltAngle) * 15;
+        if (p.y <= window.innerHeight) active = true;
+
+        confettiCtx.beginPath();
+        confettiCtx.lineWidth = p.r;
+        confettiCtx.strokeStyle = p.color;
+        confettiCtx.moveTo(p.x + p.tilt + p.r, p.y);
+        confettiCtx.lineTo(p.x + p.tilt, p.y + p.tilt + p.r);
+        confettiCtx.stroke();
+    }
+    if (active) requestAnimationFrame(renderConfetti);
+}
+

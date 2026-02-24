@@ -152,6 +152,39 @@
         </div>
     </div>
 
+    <!-- Podium / Final Rankings Screen -->
+    <div class="screen-state hidden" id="podiumScreen">
+        <div class="podium-content">
+            <h1 class="podium-title animate-slide-down">Yarışma Sonucu</h1>
+            <div class="podium-container" id="podiumContainer">
+                <!-- 2nd Place -->
+                <div class="podium-place place-2 hidden" id="podium2">
+                    <div class="podium-avatar">🥈</div>
+                    <div class="podium-name" id="podiumName2">-</div>
+                    <div class="podium-score" id="podiumScore2">0</div>
+                    <div class="podium-bar"></div>
+                </div>
+                <!-- 1st Place -->
+                <div class="podium-place place-1 hidden" id="podium1">
+                    <div class="podium-avatar">🥇</div>
+                    <div class="podium-name" id="podiumName1">-</div>
+                    <div class="podium-score" id="podiumScore1">0</div>
+                    <div class="podium-bar"></div>
+                </div>
+                <!-- 3rd Place -->
+                <div class="podium-place place-3 hidden" id="podium3">
+                    <div class="podium-avatar">🥉</div>
+                    <div class="podium-name" id="podiumName3">-</div>
+                    <div class="podium-score" id="podiumScore3">0</div>
+                    <div class="podium-bar"></div>
+                </div>
+            </div>
+
+            <!-- Confetti Canvas -->
+            <canvas id="confettiCanvas"></canvas>
+        </div>
+    </div>
+
     <!-- Connection Overlay -->
     <div class="connection-indicator" id="connectionIndicator">
         <span class="status-dot" id="connectionDot"></span>

@@ -50,6 +50,7 @@ body {
     0% {
         transform: rotate(0deg);
     }
+
     100% {
         transform: rotate(360deg);
     }
@@ -85,9 +86,12 @@ body {
 }
 
 @keyframes bounce {
-    0%, 100% {
+
+    0%,
+    100% {
         transform: translateY(0);
     }
+
     50% {
         transform: translateY(-10px);
     }
@@ -155,9 +159,12 @@ body {
 }
 
 @keyframes breathe {
-    0%, 100% {
+
+    0%,
+    100% {
         transform: scale(0.98);
     }
+
     50% {
         transform: scale(1.02);
     }
@@ -171,9 +178,12 @@ body {
 }
 
 @keyframes float {
-    0%, 100% {
+
+    0%,
+    100% {
         transform: translateY(0);
     }
+
     50% {
         transform: translateY(-20px);
     }
@@ -237,9 +247,12 @@ body {
 }
 
 @keyframes pulse {
-    0%, 100% {
+
+    0%,
+    100% {
         opacity: 1;
     }
+
     50% {
         opacity: 0.5;
     }
@@ -289,6 +302,7 @@ body {
         top: 0;
         opacity: 1;
     }
+
     100% {
         top: 100%;
         opacity: 0;
@@ -322,9 +336,12 @@ body {
 }
 
 @keyframes dangerPulse {
-    0%, 100% {
+
+    0%,
+    100% {
         transform: scale(1);
     }
+
     50% {
         transform: scale(1.1);
     }
@@ -459,10 +476,13 @@ body {
 }
 
 @keyframes dotPulse {
-    0%, 100% {
+
+    0%,
+    100% {
         opacity: 0.3;
         transform: scale(0.8);
     }
+
     50% {
         opacity: 1;
         transform: scale(1.2);
@@ -563,6 +583,7 @@ body {
     from {
         transform: rotate(0deg);
     }
+
     to {
         transform: rotate(360deg);
     }
@@ -599,9 +620,11 @@ body {
     0% {
         width: 0%;
     }
+
     50% {
         width: 70%;
     }
+
     100% {
         width: 0%;
     }
@@ -955,4 +978,136 @@ body {
         min-height: 65px;
         padding: 1vh 0.5vw;
     }
+}
+
+/* ==================== PODIUM SCREEN ==================== */
+#podiumScreen {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: radial-gradient(circle at center, rgba(30, 41, 59, 0.9) 0%, rgba(15, 23, 42, 1) 100%);
+    position: relative;
+    overflow: hidden;
+}
+
+.podium-content {
+    text-align: center;
+    z-index: 10;
+    width: 100%;
+}
+
+.podium-title {
+    font-size: clamp(3rem, 6vw, 6rem);
+    font-weight: 900;
+    text-transform: uppercase;
+    background: linear-gradient(to right, #fbbf24, #f59e0b, #d97706);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 5vh;
+    animation: pulse 2s infinite;
+    filter: drop-shadow(0 0 20px rgba(245, 158, 11, 0.5));
+}
+
+.podium-container {
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    gap: 2vw;
+    height: 50vh;
+    margin: 0 auto;
+    perspective: 1000px;
+}
+
+.podium-place {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 18vw;
+    position: relative;
+    transition: all 1s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transform-style: preserve-3d;
+}
+
+/* 1st Place is highest, 2nd mid, 3rd lowest */
+.place-1 {
+    z-index: 3;
+}
+
+.place-2 {
+    z-index: 2;
+    margin-bottom: 0;
+}
+
+.place-3 {
+    z-index: 1;
+    margin-bottom: 0;
+}
+
+.podium-bar {
+    width: 100%;
+    border-radius: 10px 10px 0 0;
+    box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.5);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.1) 0%, rgba(0, 0, 0, 0.5) 100%);
+    border-top: 2px solid rgba(255, 255, 255, 0.4);
+    transition: height 1.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+    height: 0;
+    /* Will be animated via JS */
+}
+
+/* Bar Heights & Colors */
+.place-1 .podium-bar {
+    background: linear-gradient(180deg, #fbbf24 0%, #b45309 100%);
+    border-color: #fde68a;
+}
+
+.place-2 .podium-bar {
+    background: linear-gradient(180deg, #9ca3af 0%, #4b5563 100%);
+    border-color: #e5e7eb;
+}
+
+.place-3 .podium-bar {
+    background: linear-gradient(180deg, #d97706 0%, #78350f 100%);
+    border-color: #fcd34d;
+}
+
+.podium-avatar {
+    font-size: clamp(4rem, 8vw, 8rem);
+    margin-bottom: 1vh;
+    filter: drop-shadow(0 10px 10px rgba(0, 0, 0, 0.5));
+    animation: float 4s ease-in-out infinite;
+}
+
+.place-1 .podium-avatar {
+    font-size: clamp(5rem, 10vw, 10rem);
+}
+
+.podium-name {
+    font-size: clamp(1.5rem, 2vw, 2.5rem);
+    font-weight: 800;
+    color: white;
+    margin-bottom: 0.5vh;
+    text-shadow: 0 4px 10px rgba(0, 0, 0, 0.8);
+    width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.podium-score {
+    font-size: clamp(2rem, 3vw, 4rem);
+    font-weight: 900;
+    color: #4ade80;
+    margin-bottom: 2vh;
+    text-shadow: 0 0 15px rgba(74, 222, 128, 0.5);
+}
+
+#confettiCanvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    pointer-events: none;
 }

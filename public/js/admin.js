@@ -130,10 +130,27 @@ function setupEventListeners() {
     // Soru tipi değişimi
     document.getElementById('questionType').addEventListener('change', (e) => {
         const type = e.target.value;
-        document.getElementById('optionsContainer').style.display = type === 'MULTIPLE_CHOICE' ? 'block' : 'none';
-        document.getElementById('openEndedAnswerContainer').style.display = type === 'OPEN_ENDED' ? 'block' : 'none';
+        const optsGroup = document.getElementById('optionsGroup');
+        const mcOptsGroup = document.getElementById('mcOptionsGroup');
+
+        if (type === 'MULTIPLE_CHOICE') {
+            optsGroup.style.display = 'block';
+            mcOptsGroup.style.display = 'block';
+        } else {
+            optsGroup.style.display = 'none';
+            mcOptsGroup.style.display = 'none';
+        }
     });
 
+    // Sıralama Kürsüsü Göster
+    const podiumBtn = document.getElementById('showPodiumBtn');
+    if (podiumBtn) {
+        podiumBtn.addEventListener('click', () => {
+            if (confirm('Yarışma sıralamasını (İlk 3) ekranda göstermek istediğinize emin misiniz?')) {
+                socketManager.emit('ADMIN_SHOW_PODIUM');
+            }
+        });
+    }
     // Dinamik şık ekle butonu
     document.getElementById('addOptionBtn').addEventListener('click', () => {
         const list = document.getElementById('dynamicOptionsList');

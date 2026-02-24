@@ -61,6 +61,17 @@ async function registerAdminHandlers(io, socket) {
         }
     });
 
+    // Kürsüyü Göster
+    socket.on('ADMIN_SHOW_PODIUM', async () => {
+        try {
+            const leaderboard = await db.getLeaderboard();
+            gameState.io.emit('SHOW_PODIUM', { leaderboard: leaderboard.slice(0, 3) });
+            socket.emit('ACTION_RESULT', { success: true, action: 'SHOW_PODIUM' });
+        } catch (error) {
+            socket.emit('ACTION_RESULT', { success: false, error: error.message });
+        }
+    });
+
     // Oyunu sıfırla
     socket.on('ADMIN_RESET_GAME', async () => {
         try {
