@@ -264,17 +264,29 @@ class GameState {
             }
         }
 
-        // 4. Cevapları tekrar çek (yeni eklenenler dahil)
+        // Cevapları tekrar çek (yeni eklenenler dahil)
         answers = await db.getAnswersForQuestion(this.currentQuestion.id);
 
-        const groupedAnswers = this.groupAnswers(answers);
+        // Boş cevapları otomatik olarak yanlış/0 puan işaretle (jüriye gönderme)
+        const emptyAnswerIds = answers
+            .filter(a => !a.answer_text || a.answer_text.trim() === '')
+            .map(a => a.id);
+
+        if (emptyAnswerIds.length > 0) {
+            await db.gradeAnswersBulk(emptyAnswerIds, false, 0);
+        }
+
+        // Sadece dolu cevapları jüriye gönder
+        const nonEmptyAnswers = answers.filter(a => a.answer_text && a.answer_text.trim() !== '');
+        const groupedAnswers = this.groupAnswers(nonEmptyAnswers);
 
         this.io.to('jury').emit('JURY_REVIEW_DATA', {
             questionId: this.currentQuestion.id,
             questionContent: this.currentQuestion.content,
             correctKeys: this.currentQuestion.correct_keys,
             points: this.currentQuestion.points,
-            groups: groupedAnswers
+            groups: groupedAnswers,
+            emptyCount: emptyAnswerIds.length
         });
 
         // Seyirciye bilgi ver

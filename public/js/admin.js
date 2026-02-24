@@ -11,6 +11,15 @@ let currentGameState = 'IDLE';
 let timer;
 let adminToken = null;
 
+// JSON alanlarını güvenli şekilde parse et (pg driver bazen otomatik parse eder)
+function safeParseJSON(val, fallback = []) {
+    if (Array.isArray(val)) return val;
+    if (typeof val === 'string') {
+        try { return JSON.parse(val); } catch (e) { return fallback; }
+    }
+    return fallback;
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
     // Auth kontrolü - JWT token
     adminToken = localStorage.getItem('adminAccessToken');
@@ -119,8 +128,17 @@ function setupEventListeners() {
 
     // Soru tipi değişimi
     document.getElementById('questionType').addEventListener('change', (e) => {
-        const optionsContainer = document.getElementById('optionsContainer');
-        optionsContainer.style.display = e.target.value === 'MULTIPLE_CHOICE' ? 'block' : 'none';
+        const type = e.target.value;
+        document.getElementById('optionsContainer').style.display = type === 'MULTIPLE_CHOICE' ? 'block' : 'none';
+        document.getElementById('openEndedAnswerContainer').style.display = type === 'OPEN_ENDED' ? 'block' : 'none';
+    });
+
+    // Dinamik şık ekle butonu
+    document.getElementById('addOptionBtn').addEventListener('click', () => {
+        const list = document.getElementById('dynamicOptionsList');
+        const currentCount = list.querySelectorAll('.dynamic-option-item').length;
+        list.appendChild(createDynamicOptionItem('', false, currentCount));
+        updateOptionEvents();
     });
 
     // Resim yükleme
@@ -140,6 +158,11 @@ function setupSocketEvents() {
         updateContestantsUI();
         updateLeaderboard(data.leaderboard);
         updateGameStateUI(data.gameState);
+
+        // Timer senkronizasyonu (sayfa yenilenme durumu)
+        if (data.gameState.timeRemaining != null && data.gameState.state === 'QUESTION_ACTIVE') {
+            timer.sync(data.gameState.timeRemaining);
+        }
 
         // Connection status
         document.getElementById('connectionDot').classList.add('status-online');
@@ -327,7 +350,7 @@ function updateQuestionsUI() {
 
         let typeHtml = '';
         if (q.type === 'MULTIPLE_CHOICE') {
-            const optCount = q.options ? JSON.parse(q.options).length : 0;
+            const optCount = q.options ? safeParseJSON(q.options).length : 0;
             typeHtml = `<span class="badge badge-primary">Çoktan Seçmeli (${optCount} Şık)</span>`;
         } else {
             typeHtml = `<span class="badge badge-warning">Açık Uçlu</span>`;
@@ -462,14 +485,17 @@ function openQuestionModal(question = null) {
         document.getElementById('questionContent').value = question.content;
         document.getElementById('questionCategory').value = question.category || '';
         document.getElementById('questionType').value = question.type;
-        document.getElementById('questionOptions').value = question.options ? JSON.parse(question.options).join('\n') : '';
-        document.getElementById('questionCorrectKeys').value = question.correct_keys ? JSON.parse(question.correct_keys).join('\n') : '';
         document.getElementById('questionPoints').value = question.points;
         document.getElementById('questionDuration').value = question.duration;
+        // Açık uçlu soru ise doğru cevap alanını doldur
+        if (question.type === 'OPEN_ENDED') {
+            document.getElementById('questionCorrectKeys').value = question.correct_keys ? JSON.parse(question.correct_keys).join('\n') : '';
+        }
     } else {
         title.textContent = 'Yeni Soru Ekle';
         document.getElementById('questionForm').reset();
         document.getElementById('questionId').value = '';
+        document.getElementById('questionCorrectKeys').value = '';
         // Resim alanını sıfırla
         clearImagePreview();
     }
@@ -480,7 +506,7 @@ function openQuestionModal(question = null) {
     document.getElementById('openEndedAnswerContainer').style.display = type === 'OPEN_ENDED' ? 'block' : 'none';
 
     // Dinamik şıkları yükle
-    renderDynamicOptions(question ? JSON.parse(question.options || '[]') : [], question ? JSON.parse(question.correct_keys || '[]') : []);
+    renderDynamicOptions(question ? safeParseJSON(question.options) : [], question ? safeParseJSON(question.correct_keys) : []);
 
     // Resim önizleme (düzenleme modunda)
     if (question && question.media_url) {
@@ -587,26 +613,28 @@ function renderDynamicOptions(options = [], correctKeys = []) {
 
     if (options.length === 0) {
         // Default 2 options if empty
-        list.appendChild(createDynamicOptionItem('', false));
-        list.appendChild(createDynamicOptionItem('', false));
+        list.appendChild(createDynamicOptionItem('', false, 0));
+        list.appendChild(createDynamicOptionItem('', false, 1));
     } else {
-        options.forEach(opt => {
+        options.forEach((opt, idx) => {
             const isCorrect = correctKeys.includes(opt);
-            list.appendChild(createDynamicOptionItem(opt, isCorrect));
+            list.appendChild(createDynamicOptionItem(opt, isCorrect, idx));
         });
     }
     updateOptionEvents();
 }
 
-function createDynamicOptionItem(value = '', isCorrect = false) {
+function createDynamicOptionItem(value = '', isCorrect = false, index = 0) {
+    const letter = String.fromCharCode(65 + index); // A, B, C, D...
     const div = document.createElement('div');
     div.className = 'dynamic-option-item';
     if (isCorrect) div.classList.add('correct');
 
     div.innerHTML = `
-        <input type="radio" name="correctOptionRadio" ${isCorrect ? 'checked' : ''} title="Doğru Cevabı Seç">
-        <input type="text" placeholder="Şık Metni..." value="${value.replace(/"/g, '&quot;')}">
-        <button type="button" class="remove-option-btn" title="Şıkkı Kaldır">&times;</button>
+        <span class="option-letter">${letter}</span>
+        <input type="radio" name="correctOptionRadio" ${isCorrect ? 'checked' : ''} title="Do\u011fru Cevab\u0131 Se\u00e7">
+        <input type="text" placeholder="\u015e\u0131k ${letter} metni..." value="${value.replace(/"/g, '&quot;')}">
+        <button type="button" class="remove-option-btn" title="\u015e\u0131kk\u0131 Kald\u0131r">&times;</button>
     `;
 
     return div;
@@ -643,7 +671,19 @@ function updateOptionEvents() {
                 return;
             }
             item.remove();
+            renumberOptionLetters();
         });
+    });
+}
+
+function renumberOptionLetters() {
+    const items = document.querySelectorAll('#dynamicOptionsList .dynamic-option-item');
+    items.forEach((item, idx) => {
+        const letter = String.fromCharCode(65 + idx);
+        const letterEl = item.querySelector('.option-letter');
+        const textInput = item.querySelector('input[type="text"]');
+        if (letterEl) letterEl.textContent = letter;
+        if (textInput && !textInput.value) textInput.placeholder = `Şık ${letter} metni...`;
     });
 }
 

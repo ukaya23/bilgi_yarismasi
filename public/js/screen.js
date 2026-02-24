@@ -339,7 +339,16 @@ function setupSocketEvents() {
             updateQuestionCounter('-', '-');
         }
 
-        if (data.quote) showQuote(data.quote);
+        // Aktif soru varsa ekranı hemen göster (sayfa yenilenme durumu)
+        if (data.activeQuestion) {
+            showQuestionScreen(data.activeQuestion);
+            // Timer'ı kalan süreye senkronize et
+            if (data.activeQuestion.timeRemaining != null) {
+                timer.sync(data.activeQuestion.timeRemaining);
+            }
+        }
+
+        if (data.quote && !data.activeQuestion) showQuote(data.quote);
     });
 
     socketManager.on('GAME_STATE', (data) => {

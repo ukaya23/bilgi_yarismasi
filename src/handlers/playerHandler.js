@@ -18,9 +18,28 @@ function registerPlayerHandlers(io, socket) {
     socket.join('player');
 
     // İlk durumu gönder (PLAYER_LOGIN tetiklemesi için gerekli)
-    socket.emit('INIT_DATA', {
-        gameState: gameState.getState()
-    });
+    const currentState = gameState.getState();
+    const initPayload = {
+        gameState: currentState
+    };
+
+    // Aktif soru varsa soru verisini de ekle
+    if (currentState.state === 'QUESTION_ACTIVE' && gameState.currentQuestion) {
+        initPayload.activeQuestion = {
+            id: gameState.currentQuestion.id,
+            content: gameState.currentQuestion.content,
+            type: gameState.currentQuestion.type,
+            options: gameState.currentQuestion.options,
+            points: gameState.currentQuestion.points,
+            duration: gameState.currentQuestion.duration,
+            media_url: gameState.currentQuestion.media_url,
+            index: gameState.currentQuestion.index,
+            total: gameState.currentQuestion.total,
+            timeRemaining: gameState.timeRemaining
+        };
+    }
+
+    socket.emit('INIT_DATA', initPayload);
 
     // Giriş
     socket.on('PLAYER_LOGIN', async (data) => {

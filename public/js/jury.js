@@ -167,6 +167,27 @@ function setupEventListeners() {
 // ==================== SOCKET EVENTS ====================
 
 function setupSocketEvents() {
+    // İlk veriler (yeniden bağlantı/sayfa yenileme)
+    socketManager.on('INIT_DATA', (data) => {
+        if (data.gameState) {
+            handleGameState(data.gameState);
+        }
+
+        // Aktif soru varsa göster (QUESTION_ACTIVE/LOCKED)
+        if (data.activeQuestion) {
+            currentQuestion = data.activeQuestion;
+            showActiveQuestion(data.activeQuestion);
+            if (data.activeQuestion.timeRemaining != null) {
+                updateTimer(data.activeQuestion.timeRemaining);
+            }
+        }
+
+        // GRADING durumundaysa cevap verilerini yükle
+        if (data.reviewData) {
+            loadReviewData(data.reviewData);
+        }
+    });
+
     // Oyun durumu
     socketManager.on('GAME_STATE', (data) => {
         handleGameState(data);
@@ -345,7 +366,17 @@ function loadReviewData(data) {
     // Grupları render et
     renderAnswerGroup('correct', answerGroups.correct);
     renderAnswerGroup('incorrect', answerGroups.incorrect);
-    renderAnswerGroup('empty', answerGroups.empty);
+
+    // Boş cevaplar otomatik puanlanır, sadece bilgi göster
+    const emptyCountEl = document.getElementById('emptyCount');
+    const emptyListEl = document.getElementById('emptyAnswersList');
+    if (data.emptyCount && data.emptyCount > 0) {
+        emptyCountEl.textContent = data.emptyCount;
+        emptyListEl.innerHTML = `<div class="empty-state">🔕 ${data.emptyCount} boş cevap otomatik olarak 0 puan olarak işaretlendi</div>`;
+    } else {
+        emptyCountEl.textContent = '0';
+        emptyListEl.innerHTML = '<div class="empty-state">Bu grupta cevap yok</div>';
+    }
 
     // İstatistikleri güncelle
     updateStats();

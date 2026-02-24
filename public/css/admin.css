@@ -518,70 +518,161 @@ tbody tr {
 .upload-placeholder.hidden {
     display: none;
 }
- 
- / *   D y n a m i c   O p t i o n s   L i s t   * / 
- # d y n a m i c O p t i o n s L i s t   { 
-         d i s p l a y :   f l e x ; 
-         f l e x - d i r e c t i o n :   c o l u m n ; 
-         g a p :   0 . 7 5 r e m ; 
-         m a r g i n - b o t t o m :   0 . 5 r e m ; 
- } 
- 
- . d y n a m i c - o p t i o n - i t e m   { 
-         d i s p l a y :   f l e x ; 
-         a l i g n - i t e m s :   c e n t e r ; 
-         g a p :   0 . 5 r e m ; 
-         b a c k g r o u n d :   v a r ( - - b g - d a r k e r ) ; 
-         b o r d e r :   1 p x   s o l i d   v a r ( - - b o r d e r - c o l o r ) ; 
-         p a d d i n g :   0 . 5 r e m ; 
-         b o r d e r - r a d i u s :   v a r ( - - b o r d e r - r a d i u s - s m ) ; 
-         t r a n s i t i o n :   a l l   v a r ( - - t r a n s i t i o n - f a s t ) ; 
- } 
- 
- . d y n a m i c - o p t i o n - i t e m : h o v e r   { 
-         b o r d e r - c o l o r :   v a r ( - - p r i m a r y ) ; 
- } 
- 
- . d y n a m i c - o p t i o n - i t e m . c o r r e c t   { 
-         b o r d e r - c o l o r :   v a r ( - - s u c c e s s ) ; 
-         b a c k g r o u n d :   r g b a ( 1 6 ,   1 8 5 ,   1 2 9 ,   0 . 0 5 ) ; 
- } 
- 
- . d y n a m i c - o p t i o n - i t e m   i n p u t [ t y p e = \  
- r a d i o \ ]   { 
-         m a r g i n :   0   0 . 5 r e m ; 
-         w i d t h :   1 . 2 r e m ; 
-         h e i g h t :   1 . 2 r e m ; 
-         c u r s o r :   p o i n t e r ; 
-         a c c e n t - c o l o r :   v a r ( - - s u c c e s s ) ; 
- } 
- 
- . d y n a m i c - o p t i o n - i t e m   i n p u t [ t y p e = \ t e x t \ ]   { 
-         f l e x :   1 ; 
-         b a c k g r o u n d :   t r a n s p a r e n t ; 
-         b o r d e r :   n o n e ; 
-         c o l o r :   v a r ( - - t e x t - p r i m a r y ) ; 
-         f o n t - s i z e :   0 . 9 r e m ; 
-         p a d d i n g :   0 . 2 5 r e m ; 
- } 
- 
- . d y n a m i c - o p t i o n - i t e m   i n p u t [ t y p e = \ t e x t \ ] : f o c u s   { 
-         o u t l i n e :   n o n e ; 
- } 
- 
- . d y n a m i c - o p t i o n - i t e m   . r e m o v e - o p t i o n - b t n   { 
-         b a c k g r o u n d :   t r a n s p a r e n t ; 
-         b o r d e r :   n o n e ; 
-         c o l o r :   v a r ( - - d a n g e r ) ; 
-         c u r s o r :   p o i n t e r ; 
-         f o n t - s i z e :   1 . 2 r e m ; 
-         p a d d i n g :   0   0 . 5 r e m ; 
-         o p a c i t y :   0 . 7 ; 
-         t r a n s i t i o n :   o p a c i t y   v a r ( - - t r a n s i t i o n - f a s t ) ; 
- } 
- 
- . d y n a m i c - o p t i o n - i t e m   . r e m o v e - o p t i o n - b t n : h o v e r   { 
-         o p a c i t y :   1 ; 
- } 
-  
- 
+
+/* ==================== DYNAMIC OPTIONS LIST ==================== */
+
+#dynamicOptionsList {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.dynamic-option-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    background: var(--bg-darker);
+    border: 1px solid var(--border-color);
+    padding: 0.6rem 0.85rem;
+    border-radius: 10px;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.dynamic-option-item:hover {
+    border-color: var(--primary);
+    background: rgba(99, 102, 241, 0.04);
+}
+
+.dynamic-option-item.correct {
+    border-color: var(--success);
+    background: rgba(16, 185, 129, 0.07);
+    box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.12);
+}
+
+/* Option letter label (A, B, C, D...) */
+.option-letter {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    min-width: 1.75rem;
+    border-radius: 50%;
+    background: rgba(99, 102, 241, 0.15);
+    color: var(--primary-light);
+    font-weight: 700;
+    font-size: 0.8rem;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+
+.dynamic-option-item.correct .option-letter {
+    background: rgba(16, 185, 129, 0.2);
+    color: var(--success);
+}
+
+/* Custom radio button */
+.dynamic-option-item input[type="radio"] {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 1.2rem;
+    height: 1.2rem;
+    min-width: 1.2rem;
+    border: 2px solid var(--border-color);
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+    margin: 0;
+    flex-shrink: 0;
+}
+
+.dynamic-option-item input[type="radio"]:hover {
+    border-color: var(--success);
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+}
+
+.dynamic-option-item input[type="radio"]:checked {
+    border-color: var(--success);
+    background: var(--success);
+}
+
+.dynamic-option-item input[type="radio"]:checked::after {
+    content: '\2713';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: white;
+    font-size: 0.65rem;
+    font-weight: bold;
+}
+
+/* Text input */
+.dynamic-option-item input[type="text"] {
+    flex: 1;
+    background: transparent;
+    border: none;
+    border-bottom: 1.5px solid rgba(255, 255, 255, 0.08);
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    padding: 0.35rem 0.25rem;
+    transition: border-color 0.2s ease;
+    min-width: 0;
+}
+
+.dynamic-option-item input[type="text"]:focus {
+    outline: none;
+    border-bottom-color: var(--primary);
+}
+
+.dynamic-option-item input[type="text"]::placeholder {
+    color: var(--text-muted);
+    font-style: italic;
+    font-size: 0.85rem;
+}
+
+/* Remove button */
+.dynamic-option-item .remove-option-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 1.1rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 6px;
+    opacity: 0.4;
+    transition: all 0.2s ease;
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+.dynamic-option-item .remove-option-btn:hover {
+    opacity: 1;
+    color: var(--danger);
+    background: rgba(239, 68, 68, 0.1);
+}
+
+/* Add option button */
+#addOptionBtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.45rem 0.9rem;
+    font-size: 0.8rem;
+    border: 1px dashed var(--border-color);
+    border-radius: 10px;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-top: 0.25rem;
+}
+
+#addOptionBtn:hover {
+    border-color: var(--primary);
+    color: var(--primary-light);
+    background: rgba(99, 102, 241, 0.05);
+}

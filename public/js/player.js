@@ -129,13 +129,23 @@ function setupEventListeners() {
 
 function setupSocketEvents() {
     // Socket bağlantı sonrası login gönder
-    socketManager.on('INIT_DATA', () => {
+    socketManager.on('INIT_DATA', (data) => {
         if (playerData) {
             // Yarışmacı olarak kaydol
             socketManager.emit('PLAYER_LOGIN', {
                 name: playerData.name,
                 tableNo: playerData.tableNo
             });
+        }
+
+        // Aktif soru varsa ekranı hemen göster (sayfa yenilenme durumu)
+        if (data.activeQuestion && playerData && !hasSubmitted) {
+            currentQuestion = data.activeQuestion;
+            showQuestion(data.activeQuestion);
+            // Timer'ı kalan süreye senkronize et
+            if (data.activeQuestion.timeRemaining != null) {
+                timer.sync(data.activeQuestion.timeRemaining);
+            }
         }
     });
 
