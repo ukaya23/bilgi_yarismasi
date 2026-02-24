@@ -32,6 +32,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     );
 
+    // Event listeners her zaman kurulmalı
+    setupEventListeners();
+
     // Check for existing session
     sessionToken = localStorage.getItem('playerSessionToken');
     if (sessionToken) {
@@ -41,9 +44,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
     }
-
-    // Event listeners
-    setupEventListeners();
 
     // Connection status
     updateConnectionStatus();
