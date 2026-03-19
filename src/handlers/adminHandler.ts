@@ -6,6 +6,8 @@ import type { Server, Socket } from 'socket.io';
 import db from '../../database/postgres';
 import log from '../utils/logger';
 import type { GameState } from '../state/gameState';
+import { AdminStartQuestionSchema, AdminDeleteQuestionSchema, AdminAddQuestionSchema, AdminUpdateQuestionSchema } from '../schemas/socketSchemas';
+import { validatePayload } from '../schemas/validateEvent';
 
 export async function registerAdminHandlers(io: Server, socket: Socket, gameState: GameState): Promise<void> {
     log.info({ socketId: socket.id }, 'Admin baglandi');
@@ -21,9 +23,11 @@ export async function registerAdminHandlers(io: Server, socket: Socket, gameStat
         askedQuestionIds: await db.getAskedQuestionIds(competitionId)
     });
 
-    socket.on('ADMIN_START_QUESTION', async (data: { questionId: number }) => {
+    socket.on('ADMIN_START_QUESTION', async (data: unknown) => {
         try {
-            await gameState.startQuestion(data.questionId);
+            const validated = validatePayload(AdminStartQuestionSchema, data, socket, 'ADMIN_START_QUESTION');
+            if (!validated) return;
+            await gameState.startQuestion(validated.questionId);
             socket.emit('ACTION_RESULT', { success: true, action: 'START_QUESTION' });
         } catch (error: any) {
             socket.emit('ACTION_RESULT', { success: false, error: error.message });
@@ -80,9 +84,11 @@ export async function registerAdminHandlers(io: Server, socket: Socket, gameStat
         }
     });
 
-    socket.on('ADMIN_ADD_QUESTION', async (data: any) => {
+    socket.on('ADMIN_ADD_QUESTION', async (data: unknown) => {
         try {
-            const id = await db.addQuestion(data);
+            const validated = validatePayload(AdminAddQuestionSchema, data, socket, 'ADMIN_ADD_QUESTION');
+            if (!validated) return;
+            const id = await db.addQuestion(validated);
             io.to('admin').emit('QUESTIONS_UPDATED', await db.getAllQuestions());
             socket.emit('ACTION_RESULT', { success: true, action: 'ADD_QUESTION', id });
         } catch (error: any) {
@@ -90,9 +96,11 @@ export async function registerAdminHandlers(io: Server, socket: Socket, gameStat
         }
     });
 
-    socket.on('ADMIN_UPDATE_QUESTION', async (data: any) => {
+    socket.on('ADMIN_UPDATE_QUESTION', async (data: unknown) => {
         try {
-            const { id, ...question } = data;
+            const validated = validatePayload(AdminUpdateQuestionSchema, data, socket, 'ADMIN_UPDATE_QUESTION');
+            if (!validated) return;
+            const { id, ...question } = validated;
             await db.updateQuestion(id, question);
             io.to('admin').emit('QUESTIONS_UPDATED', await db.getAllQuestions());
             socket.emit('ACTION_RESULT', { success: true, action: 'UPDATE_QUESTION' });
@@ -101,9 +109,11 @@ export async function registerAdminHandlers(io: Server, socket: Socket, gameStat
         }
     });
 
-    socket.on('ADMIN_DELETE_QUESTION', async (data: { id: number }) => {
+    socket.on('ADMIN_DELETE_QUESTION', async (data: unknown) => {
         try {
-            await db.deleteQuestion(data.id);
+            const validated = validatePayload(AdminDeleteQuestionSchema, data, socket, 'ADMIN_DELETE_QUESTION');
+            if (!validated) return;
+            await db.deleteQuestion(validated.id);
             io.to('admin').emit('QUESTIONS_UPDATED', await db.getAllQuestions());
             socket.emit('ACTION_RESULT', { success: true, action: 'DELETE_QUESTION' });
         } catch (error: any) {

@@ -7,6 +7,8 @@ import db from '../../database/postgres';
 import { groupAnswers } from '../state/gradingService';
 import log from '../utils/logger';
 import type { GameState } from '../state/gameState';
+import { JuryApproveGroupSchema, JuryManualScoreSchema, JuryRequestAnswersSchema } from '../schemas/socketSchemas';
+import { validatePayload } from '../schemas/validateEvent';
 
 export async function registerJuryHandlers(io: Server, socket: Socket, gameState: GameState): Promise<void> {
     log.info({ socketId: socket.id }, 'Jury baglandi');
@@ -53,14 +55,12 @@ export async function registerJuryHandlers(io: Server, socket: Socket, gameState
 
     socket.emit('INIT_DATA', initPayload);
 
-    socket.on('JURY_APPROVE_GROUP', async (data: { answerIds: number[]; isCorrect: boolean; points: number }) => {
+    socket.on('JURY_APPROVE_GROUP', async (data: unknown) => {
         try {
-            const { answerIds, isCorrect, points } = data;
+            const validated = validatePayload(JuryApproveGroupSchema, data, socket, 'JURY_APPROVE_GROUP');
+            if (!validated) return;
 
-            if (!answerIds || !Array.isArray(answerIds)) {
-                socket.emit('JURY_ACTION_RESULT', { success: false, error: 'Geçersiz cevap listesi' });
-                return;
-            }
+            const { answerIds, isCorrect, points } = validated;
 
             await db.gradeAnswersBulk(answerIds, isCorrect, points);
 
@@ -76,9 +76,11 @@ export async function registerJuryHandlers(io: Server, socket: Socket, gameState
         }
     });
 
-    socket.on('JURY_MANUAL_SCORE', async (data: { answerId: number; isCorrect: boolean; points: number }) => {
+    socket.on('JURY_MANUAL_SCORE', async (data: unknown) => {
         try {
-            const { answerId, isCorrect, points } = data;
+            const validated = validatePayload(JuryManualScoreSchema, data, socket, 'JURY_MANUAL_SCORE');
+            if (!validated) return;
+            const { answerId, isCorrect, points } = validated;
 
             await db.gradeAnswer(answerId, isCorrect, points);
 
@@ -109,9 +111,11 @@ export async function registerJuryHandlers(io: Server, socket: Socket, gameState
         }
     });
 
-    socket.on('JURY_REQUEST_ANSWERS', async (data: { questionId: number }) => {
+    socket.on('JURY_REQUEST_ANSWERS', async (data: unknown) => {
         try {
-            const { questionId } = data;
+            const validated = validatePayload(JuryRequestAnswersSchema, data, socket, 'JURY_REQUEST_ANSWERS');
+            if (!validated) return;
+            const { questionId } = validated;
             const answers = await db.getAnswersForQuestion(questionId, gameState.competitionId);
 
             socket.emit('JURY_ANSWERS_DATA', { questionId, answers });

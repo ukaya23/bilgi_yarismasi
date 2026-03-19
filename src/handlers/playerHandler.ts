@@ -6,6 +6,8 @@ import type { Server, Socket } from 'socket.io';
 import db from '../../database/postgres';
 import log from '../utils/logger';
 import type { GameState } from '../state/gameState';
+import { PlayerLoginSchema, PlayerSubmitAnswerSchema } from '../schemas/socketSchemas';
+import { validatePayload } from '../schemas/validateEvent';
 
 interface PlayerSocket extends Socket {
     contestantId?: number | null;
@@ -39,17 +41,15 @@ export function registerPlayerHandlers(io: Server, socket: PlayerSocket, gameSta
 
     socket.emit('INIT_DATA', initPayload);
 
-    socket.on('PLAYER_LOGIN', async (data: { name: string; tableNo: string | number }) => {
+    socket.on('PLAYER_LOGIN', async (data: unknown) => {
         try {
-            const { name, tableNo } = data;
+            const validated = validatePayload(PlayerLoginSchema, data, socket, 'PLAYER_LOGIN');
+            if (!validated) return;
 
-            if (!name || !tableNo) {
-                socket.emit('LOGIN_RESULT', { success: false, error: 'İsim ve masa numarası gerekli' });
-                return;
-            }
+            const { name, tableNo } = validated;
 
             const competitionId = gameState.competitionId;
-            const contestantId = await db.upsertContestant(name, parseInt(String(tableNo)), competitionId);
+            const contestantId = await db.upsertContestant(name, tableNo, competitionId);
             await db.updateContestantSocket(contestantId, socket.id);
 
             socket.contestantId = contestantId;
@@ -59,7 +59,7 @@ export function registerPlayerHandlers(io: Server, socket: PlayerSocket, gameSta
                 success: true,
                 contestantId,
                 name,
-                tableNo: parseInt(String(tableNo))
+                tableNo
             });
 
             socket.emit('GAME_STATE', gameState.getState());
@@ -75,8 +75,11 @@ export function registerPlayerHandlers(io: Server, socket: PlayerSocket, gameSta
         }
     });
 
-    socket.on('PLAYER_SUBMIT_ANSWER', async (data: { answer: string; timeRemaining?: number }) => {
+    socket.on('PLAYER_SUBMIT_ANSWER', async (data: unknown) => {
         try {
+            const validated = validatePayload(PlayerSubmitAnswerSchema, data, socket, 'PLAYER_SUBMIT_ANSWER');
+            if (!validated) return;
+
             const contestantId = socket.contestantId;
 
             log.debug({ socketId: socket.id, contestantId }, 'Cevap gonderme istegi');
@@ -87,7 +90,7 @@ export function registerPlayerHandlers(io: Server, socket: PlayerSocket, gameSta
                 return;
             }
 
-            const { answer, timeRemaining } = data;
+            const { answer, timeRemaining } = validated;
             log.debug({ answer, timeRemaining }, 'Cevap alindi');
 
             const result = await gameState.submitAnswer(contestantId, answer, timeRemaining);
