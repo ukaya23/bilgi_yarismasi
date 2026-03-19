@@ -553,7 +553,7 @@ function renderPlayerLeaderboard(leaderboard) {
 // ==================== HEARTBEAT ====================
 
 setInterval(() => {
-    if (socketManager.isConnected && playerData) {
+    if (socketManager && socketManager.isConnected && playerData) {
         socketManager.emit('PLAYER_HEARTBEAT');
     }
 }, 5000);

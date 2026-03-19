@@ -85,16 +85,21 @@ app.use('/api', gameRoutes);
 import { optionalSocketAuth } from './src/auth/socketAuth';
 io.use(optionalSocketAuth as any);
 
-io.on('connection', (socket: AuthenticatedSocket) => {
+io.on('connection', async (socket: AuthenticatedSocket) => {
     log.info({ socketId: socket.id, role: socket.role || 'unauthenticated' }, 'Yeni socket baglantisi');
 
     if (socket.role) {
-        const competitionId = socket.competitionId || 1;
+        // If competitionId not in JWT (e.g. admin), use active competition
+        let competitionId = socket.competitionId;
+        if (!competitionId) {
+            const active = await db.getActiveCompetition();
+            competitionId = active ? active.id : 1;
+        }
         log.info({ username: socket.username, role: socket.role, competitionId }, 'JWT authenticated');
 
-        const roomName = `${socket.role}-${competitionId}`;
-        socket.join(roomName);
-        log.debug({ socketId: socket.id, room: roomName }, 'Joined room');
+        // Join both role room and competition-specific room
+        socket.join(socket.role!);
+        socket.join(`comp-${competitionId}`);
 
         socket.competitionId = competitionId;
         const gameState = competitionManager.getGameState(competitionId);
@@ -116,8 +121,10 @@ io.on('connection', (socket: AuthenticatedSocket) => {
     }
 
     if (!socket.role) {
-        log.debug({ socketId: socket.id }, 'Unauthenticated connection -> screen handler');
-        const defaultGameState = competitionManager.getGameState(1);
+        const active = await db.getActiveCompetition();
+        const compId = active ? active.id : 1;
+        socket.join(`comp-${compId}`);
+        const defaultGameState = competitionManager.getGameState(compId);
         registerScreenHandlers(io, socket, defaultGameState);
     }
 

@@ -64,7 +64,7 @@ export async function registerAdminHandlers(io: Server, socket: Socket, gameStat
     socket.on('ADMIN_SHOW_PODIUM', async () => {
         try {
             const leaderboard = await db.getLeaderboard(competitionId);
-            gameState.io!.emit('SHOW_PODIUM', { leaderboard: leaderboard.slice(0, 3) });
+            io.to(`comp-${gameState.competitionId}`).emit('SHOW_PODIUM', { leaderboard: leaderboard.slice(0, 3) });
             socket.emit('ACTION_RESULT', { success: true, action: 'SHOW_PODIUM' });
         } catch (error: any) {
             socket.emit('ACTION_RESULT', { success: false, error: error.message });

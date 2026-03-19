@@ -65,6 +65,11 @@ export class GameState {
         this.io = io;
     }
 
+    /** Broadcast to all sockets in this competition */
+    private broadcast(event: string, data: any): void {
+        if (this.io) this.io.to(`comp-${this.competitionId}`).emit(event, data);
+    }
+
     get timeRemaining(): number {
         return this.gameTimer.timeRemaining;
     }
@@ -88,9 +93,7 @@ export class GameState {
         this.state = newState;
         await db.updateSessionState(newState, this.currentQuestion?.id || null);
 
-        if (this.io) {
-            this.io.emit('GAME_STATE', this.getState());
-        }
+        this.broadcast('GAME_STATE', this.getState());
 
         log.info({ state: newState }, 'Durum degisti');
     }
@@ -119,19 +122,20 @@ export class GameState {
 
         await this.setState('QUESTION_ACTIVE');
 
-        if (this.io) {
-            this.io.to('player').emit('NEW_QUESTION', {
-                id: this.currentQuestion.id,
-                content: this.currentQuestion.content,
-                type: this.currentQuestion.type,
-                options: this.currentQuestion.options,
-                points: this.currentQuestion.points,
-                duration: this.currentQuestion.duration,
-                media_url: this.currentQuestion.media_url,
-                index: questionIndex,
-                total: totalQuestions
-            });
+        this.broadcast('NEW_QUESTION', {
+            id: this.currentQuestion.id,
+            content: this.currentQuestion.content,
+            type: this.currentQuestion.type,
+            options: this.currentQuestion.options,
+            points: this.currentQuestion.points,
+            duration: this.currentQuestion.duration,
+            media_url: this.currentQuestion.media_url,
+            index: questionIndex,
+            total: totalQuestions
+        });
 
+        // Jury gets correct_keys too
+        if (this.io) {
             this.io.to('jury').emit('NEW_QUESTION', {
                 id: this.currentQuestion.id,
                 content: this.currentQuestion.content,
@@ -160,7 +164,7 @@ export class GameState {
             question.duration,
             (timeRemaining: number) => {
                 if (this.io) {
-                    this.io.emit('TIME_SYNC', {
+                    this.broadcast('TIME_SYNC', {
                         timeRemaining,
                         serverTime: Date.now()
                     });
@@ -206,9 +210,9 @@ export class GameState {
             this.currentQuestion.points
         );
 
-        this.io.to('jury').emit('JURY_REVIEW_DATA', reviewData);
+        this.broadcast('JURY_REVIEW_DATA', reviewData);
 
-        this.io.to('screen').emit('GRADING_STATUS', {
+        this.broadcast('GRADING_STATUS', {
             message: 'Juri Degerlendirmesi Suruyor...'
         });
     }
@@ -237,7 +241,7 @@ export class GameState {
             this.answeredPlayers.add(contestantId);
 
             if (this.io) {
-                this.io.emit('PLAYER_STATUS_UPDATE', {
+                this.broadcast('PLAYER_STATUS_UPDATE', {
                     contestantId,
                     status: 'answered'
                 });
@@ -263,7 +267,7 @@ export class GameState {
         const leaderboard = await db.getLeaderboard(this.competitionId);
         const controlMode = await db.getSetting('screen_control_mode') || 'AUTO';
 
-        this.io.emit('SHOW_RESULTS', {
+        this.broadcast('SHOW_RESULTS', {
             question: {
                 content: this.currentQuestion.content,
                 correctAnswer: this.currentQuestion.correct_keys[0] || '',
@@ -304,11 +308,11 @@ export class GameState {
         await db.resetAllContestants(this.competitionId);
 
         if (this.io) {
-            this.io.emit('GAME_RESET');
+            this.broadcast('GAME_RESET', {});
             const updatedContestants = await db.getAllContestants(this.competitionId);
             const updatedLeaderboard = await db.getLeaderboard(this.competitionId);
-            this.io.emit('CONTESTANTS_UPDATED', updatedContestants);
-            this.io.emit('LEADERBOARD_UPDATED', updatedLeaderboard);
+            this.broadcast('CONTESTANTS_UPDATED', updatedContestants);
+            this.broadcast('LEADERBOARD_UPDATED', updatedLeaderboard);
         }
 
         log.info({ competitionId: this.competitionId }, 'Oyun sifirlandi');
