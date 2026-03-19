@@ -31,7 +31,9 @@ const io = new Server(httpServer, {
 
 // ==================== MIDDLEWARE ====================
 
-app.use(express.static(path.join(__dirname, 'public')));
+// __dirname = dist/ when compiled, public/ is at project root
+const publicDir = path.join(__dirname, '..', 'public');
+app.use(express.static(publicDir));
 app.use(express.json());
 
 import rateLimit from 'express-rate-limit';
@@ -56,12 +58,12 @@ app.use('/api/', apiLimiter);
 
 // ==================== ROUTES ====================
 
-app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
-app.get('/admin-login', (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin-login.html')));
-app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
-app.get('/player', (req, res) => res.sendFile(path.join(__dirname, 'public', 'player.html')));
-app.get('/jury', (req, res) => res.sendFile(path.join(__dirname, 'public', 'jury.html')));
-app.get('/screen', (req, res) => res.sendFile(path.join(__dirname, 'public', 'screen.html')));
+app.get('/', (req, res) => res.sendFile(path.join(publicDir, 'index.html')));
+app.get('/admin-login', (req, res) => res.sendFile(path.join(publicDir, 'admin-login.html')));
+app.get('/admin', (req, res) => res.sendFile(path.join(publicDir, 'admin.html')));
+app.get('/player', (req, res) => res.sendFile(path.join(publicDir, 'player.html')));
+app.get('/jury', (req, res) => res.sendFile(path.join(publicDir, 'jury.html')));
+app.get('/screen', (req, res) => res.sendFile(path.join(publicDir, 'screen.html')));
 
 import authRoutes from './src/routes/authRoutes';
 import competitionRoutes from './src/routes/competitionRoutes';

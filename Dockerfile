@@ -5,15 +5,22 @@ WORKDIR /app
 
 # Paket dosyalarını kopyala
 COPY package*.json ./
+COPY tsconfig.json ./
 
-# Production bağımlılıkları kur
-RUN npm install --omit=dev
+# Tüm bağımlılıkları kur (TypeScript build için devDependencies dahil)
+RUN npm install
 
 # Uygulama dosyalarını kopyala
 COPY . .
+
+# TypeScript derle
+RUN npx tsc
+
+# devDependencies'i kaldır (image boyutunu küçült)
+RUN npm prune --omit=dev
 
 # Port
 EXPOSE 3000
 
 # Başlatma komutu
-CMD ["node", "server.js"]
+CMD ["node", "dist/server.js"]
