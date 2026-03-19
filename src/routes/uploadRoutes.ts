@@ -1,17 +1,17 @@
 /**
  * Upload Routes
- * Handles image upload and deletion
  */
 
-const express = require('express');
-const router = express.Router();
-const path = require('path');
-const fs = require('fs');
-const multer = require('multer');
-const { authenticateToken, requireRole } = require('../auth/authMiddleware');
-const log = require('../utils/logger');
+import express, { Request, Response } from 'express';
+import path from 'path';
+import fs from 'fs';
+import multer from 'multer';
+import { authenticateToken, requireRole } from '../auth/authMiddleware';
+import log from '../utils/logger';
+import type { AuthenticatedRequest } from '../types';
 
-// Multer konfigürasyonu
+const router = express.Router();
+
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         const uploadsDir = path.join(__dirname, '..', '..', 'public', 'uploads');
@@ -29,61 +29,50 @@ const storage = multer.diskStorage({
 
 const upload = multer({
     storage: storage,
-    limits: { fileSize: 10 * 1024 * 1024 }, // Max 10MB
+    limits: { fileSize: 10 * 1024 * 1024 },
     fileFilter: (req, file, cb) => {
         const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
         if (allowedTypes.includes(file.mimetype)) {
             cb(null, true);
         } else {
-            cb(new Error('Sadece resim dosyaları (JPEG, PNG, GIF, WEBP) yüklenebilir'), false);
+            cb(new Error('Sadece resim dosyaları (JPEG, PNG, GIF, WEBP) yüklenebilir'));
         }
     }
 });
 
-/**
- * POST /api/upload
- * Upload an image
- */
-router.post('/', authenticateToken, requireRole('admin'), upload.single('image'), (req, res) => {
+router.post('/', authenticateToken as any, requireRole('admin') as any, upload.single('image'), (req: Request, res: Response) => {
     try {
         if (!req.file) {
-            return res.status(400).json({ error: 'Dosya yüklenmedi' });
+            res.status(400).json({ error: 'Dosya yüklenmedi' });
+            return;
         }
 
         const imageUrl = '/uploads/' + req.file.filename;
         log.info({ imageUrl }, 'Resim yuklendi');
 
-        res.json({
-            success: true,
-            url: imageUrl,
-            filename: req.file.filename
-        });
+        res.json({ success: true, url: imageUrl, filename: req.file.filename });
     } catch (error) {
         log.error({ err: error }, 'Resim yukleme hatasi');
         res.status(500).json({ error: 'Resim yüklenemedi' });
     }
 });
 
-/**
- * DELETE /api/upload/:filename
- * Delete an uploaded image
- */
-router.delete('/:filename', authenticateToken, requireRole('admin'), (req, res) => {
+router.delete('/:filename', authenticateToken as any, requireRole('admin') as any, (req: any, res: Response) => {
     try {
         const { filename } = req.params;
 
-        // Path traversal koruması
         const sanitized = path.basename(filename);
         if (sanitized !== filename || filename.includes('..')) {
-            return res.status(400).json({ error: 'Geçersiz dosya adı' });
+            res.status(400).json({ error: 'Geçersiz dosya adı' });
+            return;
         }
 
         const uploadsDir = path.join(__dirname, '..', '..', 'public', 'uploads');
         const filePath = path.join(uploadsDir, sanitized);
 
-        // Çözümlenmiş yolun uploads dizini içinde olduğunu doğrula
         if (!path.resolve(filePath).startsWith(path.resolve(uploadsDir))) {
-            return res.status(400).json({ error: 'Geçersiz dosya yolu' });
+            res.status(400).json({ error: 'Geçersiz dosya yolu' });
+            return;
         }
 
         if (fs.existsSync(filePath)) {
@@ -99,4 +88,4 @@ router.delete('/:filename', authenticateToken, requireRole('admin'), (req, res) 
     }
 });
 
-module.exports = router;
+export default router;

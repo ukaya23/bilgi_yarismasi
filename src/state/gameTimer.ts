@@ -5,19 +5,14 @@
  * GameState'ten ayrilmis bagimsiz moduldur.
  */
 
-class GameTimer {
-    constructor() {
-        this.timer = null;
-        this.timeRemaining = 0;
-    }
+export class GameTimer {
+    private timer: ReturnType<typeof setInterval> | null = null;
+    timeRemaining: number = 0;
 
     /**
      * Zamanlayiciyi baslat
-     * @param {number} duration - Sure (saniye)
-     * @param {Function} onTick - Her saniye cagrilir (timeRemaining)
-     * @param {Function} onExpired - Sure dolunca cagrilir
      */
-    start(duration, onTick, onExpired) {
+    start(duration: number, onTick: (timeRemaining: number) => void, onExpired: () => Promise<void>): void {
         this.stop();
         this.timeRemaining = duration;
 
@@ -35,7 +30,7 @@ class GameTimer {
     /**
      * Zamanlayiciyi durdur
      */
-    stop() {
+    stop(): void {
         if (this.timer) {
             clearInterval(this.timer);
             this.timer = null;
@@ -45,9 +40,8 @@ class GameTimer {
 
     /**
      * Timer calisiyorsa durdur ama timeRemaining'i sifirlamadan
-     * (lockQuestion icin - sure doldugunda timeRemaining zaten 0)
      */
-    clear() {
+    clear(): void {
         if (this.timer) {
             clearInterval(this.timer);
             this.timer = null;
@@ -57,9 +51,7 @@ class GameTimer {
     /**
      * Timer calisiyor mu?
      */
-    get isRunning() {
+    get isRunning(): boolean {
         return this.timer !== null;
     }
 }
-
-module.exports = { GameTimer };

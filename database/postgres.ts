@@ -1,14 +1,20 @@
 /**
  * PostgreSQL Veritabanı Modülü
- * Migration from sql.js to PostgreSQL with async/await
  */
 
-require('dotenv').config();
-const { Pool } = require('pg');
-const bcrypt = require('bcryptjs');
-const log = require('../src/utils/logger');
+import 'dotenv/config';
+import { Pool, PoolClient } from 'pg';
+import bcrypt from 'bcryptjs';
+import log from '../src/utils/logger';
+import type {
+    Question, Contestant, Answer, Competition, AccessCode,
+    AdminUser, Quote, Setting, ValidationResult,
+    GamePhase, ContestantStatus, CompetitionStatus
+} from '../src/types';
 
 class PostgresDatabase {
+    pool: Pool;
+
     constructor() {
         this.pool = new Pool({
             connectionString: process.env.DATABASE_URL,
@@ -17,16 +23,12 @@ class PostgresDatabase {
             connectionTimeoutMillis: 2000,
         });
 
-        // Error handler for pool
-        this.pool.on('error', (err) => {
+        this.pool.on('error', (err: Error) => {
             log.error({ err }, 'Unexpected error on idle DB client');
         });
     }
 
-    /**
-     * Initialize database connection
-     */
-    async initialize() {
+    async initialize(): Promise<void> {
         try {
             const client = await this.pool.connect();
             try {
@@ -41,19 +43,13 @@ class PostgresDatabase {
         }
     }
 
-    /**
-     * Close database connection pool
-     */
-    async close() {
+    async close(): Promise<void> {
         await this.pool.end();
     }
 
     // ==================== SORU İŞLEMLERİ ====================
 
-    /**
-     * Tüm aktif soruları getir
-     */
-    async getAllQuestions() {
+    async getAllQuestions(): Promise<Question[]> {
         const result = await this.pool.query(`
             SELECT id, content, media_url, type, options, correct_keys, points, duration, category
             FROM questions
@@ -63,10 +59,7 @@ class PostgresDatabase {
         return result.rows;
     }
 
-    /**
-     * Tek soru getir
-     */
-    async getQuestionById(id) {
+    async getQuestionById(id: number): Promise<Question | null> {
         const result = await this.pool.query(`
             SELECT id, content, media_url, type, options, correct_keys, points, duration, category
             FROM questions
@@ -75,10 +68,7 @@ class PostgresDatabase {
         return result.rows[0] || null;
     }
 
-    /**
-     * Yeni soru ekle
-     */
-    async addQuestion(question) {
+    async addQuestion(question: Partial<Question>): Promise<number> {
         const result = await this.pool.query(`
             INSERT INTO questions (content, media_url, type, options, correct_keys, points, duration, category)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
@@ -96,10 +86,7 @@ class PostgresDatabase {
         return result.rows[0].id;
     }
 
-    /**
-     * Soru güncelle
-     */
-    async updateQuestion(id, question) {
+    async updateQuestion(id: number, question: Partial<Question>): Promise<number | null> {
         const result = await this.pool.query(`
             UPDATE questions
             SET content = $1, media_url = $2, type = $3, options = $4, correct_keys = $5,
@@ -120,10 +107,7 @@ class PostgresDatabase {
         return result.rowCount;
     }
 
-    /**
-     * Soru sil (soft delete)
-     */
-    async deleteQuestion(id) {
+    async deleteQuestion(id: number): Promise<number | null> {
         const result = await this.pool.query(
             'UPDATE questions SET is_active = false WHERE id = $1',
             [id]
@@ -133,10 +117,7 @@ class PostgresDatabase {
 
     // ==================== YARIŞMACI İŞLEMLERİ ====================
 
-    /**
-     * Tüm yarışmacıları getir (competitionId verilirse filtrele)
-     */
-    async getAllContestants(competitionId = null) {
+    async getAllContestants(competitionId: number | null = null): Promise<Contestant[]> {
         if (competitionId) {
             return (await this.pool.query(`
                 SELECT id, name, table_no, total_score, status, socket_id
@@ -153,10 +134,7 @@ class PostgresDatabase {
         return result.rows;
     }
 
-    /**
-     * ID'ye göre yarışmacı getir
-     */
-    async getContestantById(id) {
+    async getContestantById(id: number): Promise<Contestant | null> {
         const result = await this.pool.query(
             'SELECT * FROM contestants WHERE id = $1',
             [id]
@@ -164,18 +142,13 @@ class PostgresDatabase {
         return result.rows[0] || null;
     }
 
-    /**
-     * Yarışmacı ekle veya güncelle (masa numarasına göre, yarışma bazlı)
-     */
-    async upsertContestant(name, tableNo, competitionId = 1) {
-        // First check for unique constraint on table_no + competition_id
+    async upsertContestant(name: string, tableNo: number, competitionId: number = 1): Promise<number> {
         const existing = await this.pool.query(`
             SELECT id FROM contestants
             WHERE table_no = $1 AND competition_id = $2
         `, [tableNo, competitionId]);
 
         if (existing.rows.length > 0) {
-            // Update existing contestant
             const result = await this.pool.query(`
                 UPDATE contestants
                 SET name = $1, status = 'ONLINE'
@@ -184,7 +157,6 @@ class PostgresDatabase {
             `, [name, tableNo, competitionId]);
             return result.rows[0].id;
         } else {
-            // Insert new contestant
             const result = await this.pool.query(`
                 INSERT INTO contestants (name, table_no, competition_id, status)
                 VALUES ($1, $2, $3, 'ONLINE')
@@ -194,10 +166,7 @@ class PostgresDatabase {
         }
     }
 
-    /**
-     * Yarışmacı socket ID güncelle
-     */
-    async updateContestantSocket(id, socketId) {
+    async updateContestantSocket(id: number, socketId: string): Promise<number | null> {
         const result = await this.pool.query(
             `UPDATE contestants SET socket_id = $1, status = 'ONLINE' WHERE id = $2`,
             [socketId, id]
@@ -205,10 +174,7 @@ class PostgresDatabase {
         return result.rowCount;
     }
 
-    /**
-     * Yarışmacı durumunu güncelle
-     */
-    async updateContestantStatus(id, status) {
+    async updateContestantStatus(id: number, status: ContestantStatus): Promise<number | null> {
         const result = await this.pool.query(
             'UPDATE contestants SET status = $1 WHERE id = $2',
             [status, id]
@@ -216,10 +182,7 @@ class PostgresDatabase {
         return result.rowCount;
     }
 
-    /**
-     * Yarışmacı puanını güncelle
-     */
-    async updateContestantScore(id, pointsToAdd) {
+    async updateContestantScore(id: number, pointsToAdd: number): Promise<number | null> {
         const result = await this.pool.query(
             'UPDATE contestants SET total_score = total_score + $1 WHERE id = $2',
             [pointsToAdd, id]
@@ -227,10 +190,7 @@ class PostgresDatabase {
         return result.rowCount;
     }
 
-    /**
-     * Socket ID ile yarışmacı bul
-     */
-    async getContestantBySocketId(socketId) {
+    async getContestantBySocketId(socketId: string): Promise<Contestant | null> {
         const result = await this.pool.query(
             'SELECT * FROM contestants WHERE socket_id = $1',
             [socketId]
@@ -238,10 +198,7 @@ class PostgresDatabase {
         return result.rows[0] || null;
     }
 
-    /**
-     * Liderlik tablosunu getir (competitionId verilirse filtrele)
-     */
-    async getLeaderboard(competitionId = null) {
+    async getLeaderboard(competitionId: number | null = null): Promise<Contestant[]> {
         if (competitionId) {
             return (await this.pool.query(`
                 SELECT id, name, table_no, total_score
@@ -259,16 +216,12 @@ class PostgresDatabase {
         return result.rows;
     }
 
-    /**
-     * Yarışmacıları sil (competitionId verilirse sadece o yarışmanınkileri)
-     */
-    async resetAllContestants(competitionId = null) {
+    async resetAllContestants(competitionId: number | null = null): Promise<void> {
         const client = await this.pool.connect();
         try {
             await client.query('BEGIN');
 
             if (competitionId) {
-                // Sadece bu yarışmaya ait cevapları ve yarışmacıları sil
                 await client.query(`
                     DELETE FROM answers WHERE contestant_id IN (
                         SELECT id FROM contestants WHERE competition_id = $1
@@ -279,11 +232,10 @@ class PostgresDatabase {
                 await client.query('DELETE FROM answers');
                 await client.query('DELETE FROM contestants');
 
-                // Opsiyonel: ID'leri sıfırlamaya çalış
                 try {
                     await client.query('ALTER SEQUENCE answers_id_seq RESTART WITH 1');
                     await client.query('ALTER SEQUENCE contestants_id_seq RESTART WITH 1');
-                } catch (seqError) {
+                } catch (seqError: any) {
                     log.debug({ message: seqError.message }, 'Sequence reset atlaniyor');
                 }
             }
@@ -297,10 +249,7 @@ class PostgresDatabase {
         }
     }
 
-    /**
-     * Yarışmadaki tüm erişim kodlarını sıfırla (tekrar kullanım için)
-     */
-    async resetAllAccessCodes(competitionId) {
+    async resetAllAccessCodes(competitionId: number): Promise<number | null> {
         const result = await this.pool.query(
             'UPDATE access_codes SET is_used = false, session_token = NULL, used_at = NULL WHERE competition_id = $1',
             [competitionId]
@@ -310,15 +259,11 @@ class PostgresDatabase {
 
     // ==================== CEVAP İŞLEMLERİ ====================
 
-    /**
-     * Cevap kaydet (Transaction ile)
-     */
-    async saveAnswer(questionId, contestantId, answerText, timeRemaining) {
+    async saveAnswer(questionId: number, contestantId: number, answerText: string, timeRemaining: number): Promise<{ success: boolean; message?: string; id?: number }> {
         const client = await this.pool.connect();
         try {
             await client.query('BEGIN');
 
-            // Duplicate check
             const existing = await client.query(
                 'SELECT id FROM answers WHERE question_id = $1 AND contestant_id = $2',
                 [questionId, contestantId]
@@ -345,14 +290,10 @@ class PostgresDatabase {
         }
     }
 
-    /**
-     * Toplu bos cevap kaydet (cevap vermeyen yarismacilar icin)
-     */
-    async saveAnswersBulk(questionId, contestantIds) {
+    async saveAnswersBulk(questionId: number, contestantIds: number[]): Promise<void> {
         if (!contestantIds || contestantIds.length === 0) return;
 
-        // ($1, $2, '', 0), ($1, $3, '', 0), ... seklinde VALUES olustur
-        const params = [questionId];
+        const params: (number)[] = [questionId];
         const valueClauses = contestantIds.map((cId, i) => {
             params.push(cId);
             return `($1, $${i + 2}, '', 0)`;
@@ -365,10 +306,7 @@ class PostgresDatabase {
         );
     }
 
-    /**
-     * Bir soruya verilen tüm cevapları getir (competitionId verilirse filtrele)
-     */
-    async getAnswersForQuestion(questionId, competitionId = null) {
+    async getAnswersForQuestion(questionId: number, competitionId: number | null = null): Promise<Answer[]> {
         if (competitionId) {
             return (await this.pool.query(`
                 SELECT a.id, a.answer_text, a.is_correct, a.points_awarded, a.time_remaining,
@@ -390,10 +328,7 @@ class PostgresDatabase {
         return result.rows;
     }
 
-    /**
-     * Daha önce sorulmuş soru ID'lerini getir (competitionId verilirse filtrele)
-     */
-    async getAskedQuestionIds(competitionId = null) {
+    async getAskedQuestionIds(competitionId: number | null = null): Promise<number[]> {
         if (competitionId) {
             const result = await this.pool.query(`
                 SELECT DISTINCT a.question_id
@@ -401,18 +336,15 @@ class PostgresDatabase {
                 JOIN contestants c ON a.contestant_id = c.id
                 WHERE c.competition_id = $1
             `, [competitionId]);
-            return result.rows.map(r => r.question_id);
+            return result.rows.map((r: any) => r.question_id);
         }
         const result = await this.pool.query(
             'SELECT DISTINCT question_id FROM answers'
         );
-        return result.rows.map(r => r.question_id);
+        return result.rows.map((r: any) => r.question_id);
     }
 
-    /**
-     * Cevabı puanla
-     */
-    async gradeAnswer(answerId, isCorrect, points) {
+    async gradeAnswer(answerId: number, isCorrect: boolean, points: number): Promise<void> {
         const client = await this.pool.connect();
         try {
             await client.query('BEGIN');
@@ -444,23 +376,18 @@ class PostgresDatabase {
         }
     }
 
-    /**
-     * Toplu cevap puanla (tek SQL ile)
-     */
-    async gradeAnswersBulk(answerIds, isCorrect, points) {
+    async gradeAnswersBulk(answerIds: number[], isCorrect: boolean, points: number): Promise<void> {
         if (!answerIds || answerIds.length === 0) return;
 
         const client = await this.pool.connect();
         try {
             await client.query('BEGIN');
 
-            // Tek UPDATE ile tum cevaplari puanla
             await client.query(
                 'UPDATE answers SET is_correct = $1, points_awarded = $2 WHERE id = ANY($3)',
                 [isCorrect, points, answerIds]
             );
 
-            // Puan varsa yarismaci skorlarini tek sorguda guncelle
             if (points > 0) {
                 await client.query(`
                     UPDATE contestants c
@@ -481,30 +408,21 @@ class PostgresDatabase {
 
     // ==================== ÖZLÜ SÖZ İŞLEMLERİ ====================
 
-    /**
-     * Rastgele özlü söz getir
-     */
-    async getRandomQuote() {
+    async getRandomQuote(): Promise<Quote | null> {
         const result = await this.pool.query(
             'SELECT * FROM quotes ORDER BY RANDOM() LIMIT 1'
         );
         return result.rows[0] || null;
     }
 
-    /**
-     * Tüm özlü sözleri getir
-     */
-    async getAllQuotes() {
+    async getAllQuotes(): Promise<Quote[]> {
         const result = await this.pool.query('SELECT * FROM quotes ORDER BY id');
         return result.rows;
     }
 
     // ==================== OYUN OTURUMU İŞLEMLERİ ====================
 
-    /**
-     * Aktif oturumu getir veya oluştur
-     */
-    async getOrCreateSession() {
+    async getOrCreateSession(): Promise<any> {
         let result = await this.pool.query(
             'SELECT * FROM game_sessions ORDER BY id DESC LIMIT 1'
         );
@@ -519,10 +437,7 @@ class PostgresDatabase {
         return result.rows[0];
     }
 
-    /**
-     * Oyun durumunu güncelle
-     */
-    async updateSessionState(state, questionId = null) {
+    async updateSessionState(state: GamePhase, questionId: number | null = null): Promise<any> {
         const result = await this.pool.query(`
             UPDATE game_sessions
             SET state = $1, current_question_id = $2, question_start_time = CURRENT_TIMESTAMP
@@ -534,10 +449,7 @@ class PostgresDatabase {
 
     // ==================== AYARLAR İŞLEMLERİ ====================
 
-    /**
-     * Ayar getir
-     */
-    async getSetting(key) {
+    async getSetting(key: string): Promise<string | null> {
         const result = await this.pool.query(
             'SELECT value FROM settings WHERE key = $1',
             [key]
@@ -545,18 +457,12 @@ class PostgresDatabase {
         return result.rows[0] ? result.rows[0].value : null;
     }
 
-    /**
-     * Tüm ayarları getir
-     */
-    async getAllSettings() {
+    async getAllSettings(): Promise<Setting[]> {
         const result = await this.pool.query('SELECT * FROM settings ORDER BY key');
         return result.rows;
     }
 
-    /**
-     * Ayar güncelle veya ekle
-     */
-    async setSetting(key, value, description = null) {
+    async setSetting(key: string, value: string, description: string | null = null): Promise<Setting> {
         const result = await this.pool.query(`
             INSERT INTO settings (key, value, description)
             VALUES ($1, $2, $3)
@@ -568,10 +474,7 @@ class PostgresDatabase {
 
     // ==================== ADMİN İŞLEMLERİ ====================
 
-    /**
-     * Varsayılan admin kullanıcısını oluştur
-     */
-    async ensureDefaultAdmin() {
+    async ensureDefaultAdmin(): Promise<void> {
         const existing = await this.pool.query(
             'SELECT id FROM admin_users WHERE username = $1',
             ['admin']
@@ -587,10 +490,7 @@ class PostgresDatabase {
         }
     }
 
-    /**
-     * Kullanıcı adına göre admin kullanıcı getir
-     */
-    async getAdminByUsername(username) {
+    async getAdminByUsername(username: string): Promise<AdminUser | null> {
         const result = await this.pool.query(
             'SELECT id, username, password_hash FROM admin_users WHERE username = $1',
             [username]
@@ -598,20 +498,14 @@ class PostgresDatabase {
         return result.rows[0] || null;
     }
 
-    /**
-     * Admin şifresini güncelle
-     */
-    async updateAdminPassword(adminId, hashedPassword) {
+    async updateAdminPassword(adminId: number, hashedPassword: string): Promise<void> {
         await this.pool.query(
             'UPDATE admin_users SET password_hash = $1 WHERE id = $2',
             [hashedPassword, adminId]
         );
     }
 
-    /**
-     * Admin kimlik doğrulama
-     */
-    async authenticateAdmin(username, password) {
+    async authenticateAdmin(username: string, password: string): Promise<{ id: number; username: string } | null> {
         const result = await this.pool.query(
             'SELECT id, username, password_hash FROM admin_users WHERE username = $1',
             [username]
@@ -633,10 +527,7 @@ class PostgresDatabase {
 
     // ==================== YARIŞMA İŞLEMLERİ ====================
 
-    /**
-     * Yarışma oluştur
-     */
-    async createCompetition(name, contestantCount, juryCount) {
+    async createCompetition(name: string, contestantCount: number, juryCount: number): Promise<number> {
         const result = await this.pool.query(`
             INSERT INTO competitions (name, contestant_count, jury_count, status)
             VALUES ($1, $2, $3, 'ACTIVE')
@@ -645,30 +536,21 @@ class PostgresDatabase {
         return result.rows[0].id;
     }
 
-    /**
-     * Aktif yarışmayı getir
-     */
-    async getActiveCompetition() {
+    async getActiveCompetition(): Promise<Competition | null> {
         const result = await this.pool.query(
             "SELECT * FROM competitions WHERE status = 'ACTIVE' ORDER BY id DESC LIMIT 1"
         );
         return result.rows[0] || null;
     }
 
-    /**
-     * Tüm aktif yarışmaları getir
-     */
-    async getActiveCompetitions() {
+    async getActiveCompetitions(): Promise<Competition[]> {
         const result = await this.pool.query(
             "SELECT * FROM competitions WHERE status = 'ACTIVE' ORDER BY created_at DESC"
         );
         return result.rows;
     }
 
-    /**
-     * ID'ye göre yarışma getir
-     */
-    async getCompetitionById(id) {
+    async getCompetitionById(id: number): Promise<Competition | null> {
         const result = await this.pool.query(
             'SELECT * FROM competitions WHERE id = $1',
             [id]
@@ -676,10 +558,7 @@ class PostgresDatabase {
         return result.rows[0] || null;
     }
 
-    /**
-     * Yarışma bilgilerini güncelle
-     */
-    async updateCompetition(id, updates) {
+    async updateCompetition(id: number, updates: { name?: string; status?: CompetitionStatus }): Promise<number | null> {
         const { name, status } = updates;
         const result = await this.pool.query(
             'UPDATE competitions SET name = COALESCE($1, name), status = COALESCE($2, status) WHERE id = $3',
@@ -688,10 +567,7 @@ class PostgresDatabase {
         return result.rowCount;
     }
 
-    /**
-     * Yarışma durumunu güncelle
-     */
-    async updateCompetitionStatus(id, status) {
+    async updateCompetitionStatus(id: number, status: CompetitionStatus): Promise<number | null> {
         const result = await this.pool.query(
             'UPDATE competitions SET status = $1 WHERE id = $2',
             [status, id]
@@ -699,10 +575,7 @@ class PostgresDatabase {
         return result.rowCount;
     }
 
-    /**
-     * Yarışmaya kayıtlı yarışmacıları getir
-     */
-    async getContestantsByCompetition(competitionId) {
+    async getContestantsByCompetition(competitionId: number): Promise<Contestant[]> {
         const result = await this.pool.query(`
             SELECT id, name, table_no, total_score, status, socket_id
             FROM contestants
@@ -712,10 +585,7 @@ class PostgresDatabase {
         return result.rows;
     }
 
-    /**
-     * Yarışma sıralamasını getir
-     */
-    async getLeaderboardByCompetition(competitionId) {
+    async getLeaderboardByCompetition(competitionId: number): Promise<Contestant[]> {
         const result = await this.pool.query(`
             SELECT id, name, table_no, total_score
             FROM contestants
@@ -727,15 +597,11 @@ class PostgresDatabase {
 
     // ==================== ERİŞİM KODU İŞLEMLERİ ====================
 
-    /**
-     * Erisim kodlari olustur (tek multi-row INSERT)
-     */
-    async generateAccessCodes(competitionId, contestantCount, juryCount) {
-        const params = [];
-        const valueClauses = [];
+    async generateAccessCodes(competitionId: number, contestantCount: number, juryCount: number): Promise<AccessCode[]> {
+        const params: (number | string)[] = [];
+        const valueClauses: string[] = [];
         let paramIdx = 1;
 
-        // Yarismaci kodlari
         for (let i = 1; i <= contestantCount; i++) {
             const code = Math.floor(100000 + Math.random() * 900000).toString();
             valueClauses.push(`($${paramIdx}, $${paramIdx + 1}, 'CONTESTANT', $${paramIdx + 2}, $${paramIdx + 3})`);
@@ -743,7 +609,6 @@ class PostgresDatabase {
             paramIdx += 4;
         }
 
-        // Juri kodlari
         for (let i = 1; i <= juryCount; i++) {
             const code = Math.floor(100000 + Math.random() * 900000).toString();
             valueClauses.push(`($${paramIdx}, $${paramIdx + 1}, 'JURY', $${paramIdx + 2}, $${paramIdx + 3})`);
@@ -760,10 +625,7 @@ class PostgresDatabase {
         return result.rows;
     }
 
-    /**
-     * Erişim kodunu doğrula
-     */
-    async validateAccessCode(code) {
+    async validateAccessCode(code: string): Promise<ValidationResult> {
         const result = await this.pool.query(`
             SELECT ac.*, c.name as competition_name, c.status as competition_status
             FROM access_codes ac
@@ -784,10 +646,7 @@ class PostgresDatabase {
         return { valid: true, accessCode };
     }
 
-    /**
-     * Erişim kodunu kullanıldı olarak işaretle
-     */
-    async markCodeAsUsed(codeId, sessionToken) {
+    async markCodeAsUsed(codeId: number, sessionToken: string): Promise<AccessCode> {
         const result = await this.pool.query(`
             UPDATE access_codes
             SET is_used = true, session_token = $1, used_at = CURRENT_TIMESTAMP
@@ -797,10 +656,7 @@ class PostgresDatabase {
         return result.rows[0];
     }
 
-    /**
-     * Session token ile erişim kodunu bul (Competition JOIN ile)
-     */
-    async validateSessionToken(token) {
+    async validateSessionToken(token: string): Promise<AccessCode | null> {
         const result = await this.pool.query(`
             SELECT ac.*, c.name as competition_name
             FROM access_codes ac
@@ -810,10 +666,7 @@ class PostgresDatabase {
         return result.rows[0] || null;
     }
 
-    /**
-     * Yarışma erişim kodlarını getir
-     */
-    async getAccessCodesByCompetition(competitionId) {
+    async getAccessCodesByCompetition(competitionId: number): Promise<AccessCode[]> {
         const result = await this.pool.query(
             'SELECT * FROM access_codes WHERE competition_id = $1 ORDER BY role, slot_number',
             [competitionId]
@@ -823,10 +676,7 @@ class PostgresDatabase {
 
     // ==================== JWT TOKEN İŞLEMLERİ ====================
 
-    /**
-     * Token'ı iptal edilmiş listesine ekle
-     */
-    async revokeToken(tokenId, userId, reason = 'manual_revoke') {
+    async revokeToken(tokenId: string, userId: number, reason: string = 'manual_revoke'): Promise<any> {
         const result = await this.pool.query(`
             INSERT INTO revoked_tokens (token_id, user_id, reason)
             VALUES ($1, $2, $3)
@@ -836,10 +686,7 @@ class PostgresDatabase {
         return result.rows[0];
     }
 
-    /**
-     * Token'ın iptal edilip edilmediğini kontrol et
-     */
-    async isTokenRevoked(tokenId) {
+    async isTokenRevoked(tokenId: string): Promise<boolean> {
         const result = await this.pool.query(
             'SELECT EXISTS(SELECT 1 FROM revoked_tokens WHERE token_id = $1) as revoked',
             [tokenId]
@@ -847,13 +694,7 @@ class PostgresDatabase {
         return result.rows[0].revoked;
     }
 
-    /**
-     * Kullanıcının tüm token'larını iptal et
-     * user_id bazlı revoke kaydı oluşturur - isTokenRevoked kontrolü bunu da kontrol etmeli
-     */
-    async revokeAllUserTokens(userId, reason = 'logout_all') {
-        // Kullanıcı bazlı revoke timestamp'i kaydet
-        // isTokenRevoked bu timestamp'ten önce oluşturulan tüm token'ları geçersiz sayacak
+    async revokeAllUserTokens(userId: number, reason: string = 'logout_all'): Promise<number | null> {
         const result = await this.pool.query(`
             INSERT INTO revoked_tokens (token_id, user_id, reason)
             VALUES ($1, $2, $3)
@@ -862,18 +703,13 @@ class PostgresDatabase {
         return result.rowCount;
     }
 
-    /**
-     * Token'ın iptal edilip edilmediğini kontrol et (user-level revoke dahil)
-     */
-    async isTokenRevokedOrUserBanned(tokenId, userId, tokenIssuedAt) {
-        // 1. Token ID bazlı kontrol
+    async isTokenRevokedOrUserBanned(tokenId: string, userId: number, tokenIssuedAt: number): Promise<boolean> {
         const tokenCheck = await this.pool.query(
             'SELECT EXISTS(SELECT 1 FROM revoked_tokens WHERE token_id = $1) as revoked',
             [tokenId]
         );
         if (tokenCheck.rows[0].revoked) return true;
 
-        // 2. User bazlı toplu revoke kontrolü - token'ın oluşturulma zamanından sonra revoke yapılmış mı?
         if (userId && tokenIssuedAt) {
             const userCheck = await this.pool.query(`
                 SELECT EXISTS(
@@ -889,10 +725,7 @@ class PostgresDatabase {
         return false;
     }
 
-    /**
-     * Eski iptal edilmiş token'ları temizle (7 günden eski)
-     */
-    async cleanupRevokedTokens() {
+    async cleanupRevokedTokens(): Promise<number | null> {
         const result = await this.pool.query(`
             DELETE FROM revoked_tokens
             WHERE revoked_at < NOW() - INTERVAL '7 days'
@@ -902,10 +735,7 @@ class PostgresDatabase {
 
     // ==================== ERİŞİM KODU EK İŞLEMLERİ ====================
 
-    /**
-     * Erişim kodu ismini güncelle
-     */
-    async updateAccessCodeName(codeId, name) {
+    async updateAccessCodeName(codeId: number, name: string): Promise<number | null> {
         const result = await this.pool.query(
             'UPDATE access_codes SET name = $1 WHERE id = $2',
             [name, codeId]
@@ -913,10 +743,7 @@ class PostgresDatabase {
         return result.rowCount;
     }
 
-    /**
-     * Erişim kodunu sıfırla
-     */
-    async resetAccessCode(codeId) {
+    async resetAccessCode(codeId: number): Promise<number | null> {
         const result = await this.pool.query(
             'UPDATE access_codes SET is_used = false, session_token = NULL, used_at = NULL WHERE id = $1',
             [codeId]
@@ -925,4 +752,5 @@ class PostgresDatabase {
     }
 }
 
-module.exports = new PostgresDatabase();
+const db = new PostgresDatabase();
+export default db;

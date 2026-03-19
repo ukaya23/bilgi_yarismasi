@@ -2,26 +2,25 @@
  * Seyirci Ekranı Event Handler
  */
 
-const db = require('../../database/postgres');
-const log = require('../utils/logger');
+import type { Server, Socket } from 'socket.io';
+import db from '../../database/postgres';
+import log from '../utils/logger';
+import type { GameState } from '../state/gameState';
 
-async function registerScreenHandlers(io, socket, gameState) {
+export async function registerScreenHandlers(io: Server, socket: Socket, gameState: GameState): Promise<void> {
     log.info({ socketId: socket.id }, 'Screen baglandi');
 
-    // Screen odasına katıl
     socket.join('screen');
 
-    // İlk verileri gönder
     const currentState = gameState.getState();
     const competitionId = gameState.competitionId;
-    const initPayload = {
+    const initPayload: any = {
         contestants: await db.getAllContestants(competitionId),
         leaderboard: await db.getLeaderboard(competitionId),
         gameState: currentState,
         quote: await db.getRandomQuote()
     };
 
-    // Aktif soru varsa maskelenmiş soru verisini de ekle
     if ((currentState.state === 'QUESTION_ACTIVE' || currentState.state === 'LOCKED') && gameState.currentQuestion) {
         initPayload.activeQuestion = {
             category: gameState.currentQuestion.category || 'Genel Kültür',
@@ -36,7 +35,6 @@ async function registerScreenHandlers(io, socket, gameState) {
 
     socket.emit('INIT_DATA', initPayload);
 
-    // Yeni özlü söz iste
     socket.on('SCREEN_REQUEST_QUOTE', async () => {
         try {
             socket.emit('NEW_QUOTE', await db.getRandomQuote());
@@ -45,10 +43,7 @@ async function registerScreenHandlers(io, socket, gameState) {
         }
     });
 
-    // Bağlantı kopması
     socket.on('disconnect', () => {
         log.info({ socketId: socket.id }, 'Screen ayrildi');
     });
 }
-
-module.exports = { registerScreenHandlers };

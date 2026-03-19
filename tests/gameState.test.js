@@ -119,7 +119,8 @@ describe('GameState - State Machine', () => {
     });
 
     it('should warn but allow invalid transition', async () => {
-        const log = require('../src/utils/logger');
+        const logModule = require('../src/utils/logger');
+        const log = logModule.default || logModule;
         const spy = jest.spyOn(log, 'warn').mockImplementation();
 
         await gs.setState('GRADING'); // IDLE -> GRADING is invalid

@@ -1,23 +1,23 @@
 /**
  * Grading Service - Puanlama ve cevap gruplama mantigi
  *
- * GameState'ten ayrilmis bagimsiz moduldur.
  * Levenshtein benzerlik algoritmasi, cevap gruplama,
  * otomatik puanlama ve juri degerlendirmesi hazirligi.
  */
 
-const db = require('../../database/postgres');
-const log = require('../utils/logger');
+import db from '../../database/postgres';
+import log from '../utils/logger';
+import type { Answer, AnswerGroups, JuryReviewData } from '../types';
 
 /**
  * Basit benzerlik kontrolu (Levenshtein mesafesi)
  */
-function isSimilar(str1, str2, threshold = 0.8) {
+export function isSimilar(str1: string, str2: string, threshold: number = 0.8): boolean {
     if (str1 === str2) return true;
 
     const len1 = str1.length;
     const len2 = str2.length;
-    const matrix = [];
+    const matrix: number[][] = [];
 
     for (let i = 0; i <= len1; i++) {
         matrix[i] = [i];
@@ -46,12 +46,9 @@ function isSimilar(str1, str2, threshold = 0.8) {
 
 /**
  * Cevaplari grupla (dogru/yanlis/bos)
- * @param {Array} answers - Cevap listesi
- * @param {Array} correctKeys - Dogru cevap anahtarlari
- * @returns {{ correct: Array, incorrect: Array, empty: Array }}
  */
-function groupAnswers(answers, correctKeys) {
-    const groups = {
+export function groupAnswers(answers: Answer[], correctKeys: string[]): AnswerGroups {
+    const groups: AnswerGroups = {
         correct: [],
         incorrect: [],
         empty: []
@@ -81,10 +78,8 @@ function groupAnswers(answers, correctKeys) {
 
 /**
  * Cevap vermeyen yarismacilar icin bos cevap olustur (batch INSERT)
- * @param {number} questionId
- * @param {number} competitionId
  */
-async function createEmptyAnswers(questionId, competitionId) {
+export async function createEmptyAnswers(questionId: number, competitionId: number): Promise<void> {
     const existingAnswers = await db.getAnswersForQuestion(questionId, competitionId);
     const allContestants = await db.getAllContestants(competitionId);
     const answeredContestantIds = new Set(existingAnswers.map(a => a.contestant_id));
@@ -101,21 +96,14 @@ async function createEmptyAnswers(questionId, competitionId) {
 
 /**
  * Coktan secmeli soruyu otomatik puanla
- * @param {number} questionId
- * @param {number} competitionId
- * @param {Array} correctKeys
- * @param {number} points
  */
-async function autoGradeMultipleChoice(questionId, competitionId, correctKeys, points) {
-    // 1. Cevap vermeyenler icin bos cevap olustur
+export async function autoGradeMultipleChoice(questionId: number, competitionId: number, correctKeys: string[], points: number): Promise<void> {
     await createEmptyAnswers(questionId, competitionId);
 
-    // 2. Tum cevaplari al
     const answers = await db.getAnswersForQuestion(questionId, competitionId);
 
-    // 3. Dogru ve yanlis cevaplari grupla
-    const correctIds = [];
-    const incorrectIds = [];
+    const correctIds: number[] = [];
+    const incorrectIds: number[] = [];
 
     for (const answer of answers) {
         if (answer.answer_text && correctKeys.includes(answer.answer_text)) {
@@ -125,7 +113,6 @@ async function autoGradeMultipleChoice(questionId, competitionId, correctKeys, p
         }
     }
 
-    // 4. Toplu puanlama (2 sorgu yerine N sorgu)
     log.debug({ questionId, correct: correctIds.length, incorrect: incorrectIds.length }, 'Otomatik puanlama');
     if (correctIds.length > 0) {
         await db.gradeAnswersBulk(correctIds, true, points);
@@ -137,21 +124,12 @@ async function autoGradeMultipleChoice(questionId, competitionId, correctKeys, p
 
 /**
  * Juri degerlendirmesi icin veri hazirla
- * @param {number} questionId
- * @param {number} competitionId
- * @param {string} questionContent
- * @param {Array} correctKeys
- * @param {number} points
- * @returns {{ questionId, questionContent, correctKeys, points, groups, emptyCount }}
  */
-async function prepareJuryReview(questionId, competitionId, questionContent, correctKeys, points) {
-    // 1. Cevap vermeyenler icin bos cevap olustur
+export async function prepareJuryReview(questionId: number, competitionId: number, questionContent: string, correctKeys: string[], points: number): Promise<JuryReviewData> {
     await createEmptyAnswers(questionId, competitionId);
 
-    // 2. Tum cevaplari al
     const answers = await db.getAnswersForQuestion(questionId, competitionId);
 
-    // 3. Bos cevaplari otomatik olarak yanlis/0 puan isle
     const emptyAnswerIds = answers
         .filter(a => !a.answer_text || a.answer_text.trim() === '')
         .map(a => a.id);
@@ -160,7 +138,6 @@ async function prepareJuryReview(questionId, competitionId, questionContent, cor
         await db.gradeAnswersBulk(emptyAnswerIds, false, 0);
     }
 
-    // 4. Dolu cevaplari grupla
     const nonEmptyAnswers = answers.filter(a => a.answer_text && a.answer_text.trim() !== '');
     const groups = groupAnswers(nonEmptyAnswers, correctKeys);
 
@@ -174,11 +151,3 @@ async function prepareJuryReview(questionId, competitionId, questionContent, cor
         emptyCount: emptyAnswerIds.length
     };
 }
-
-module.exports = {
-    isSimilar,
-    groupAnswers,
-    createEmptyAnswers,
-    autoGradeMultipleChoice,
-    prepareJuryReview
-};

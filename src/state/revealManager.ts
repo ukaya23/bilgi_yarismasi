@@ -5,9 +5,10 @@
  * Manuel modda admin'in adim adim sonuclari gostermesini yonetir.
  */
 
-const log = require('../utils/logger');
+import type { Server } from 'socket.io';
+import log from '../utils/logger';
 
-const REVEAL_STEPS = [
+const REVEAL_STEPS: string[] = [
     'Baslangic',
     'Resim Gosterimi',
     'Soru Gosterimi',
@@ -20,23 +21,20 @@ const REVEAL_STEPS = [
 
 const LAST_STEP = 6;
 
-class RevealManager {
-    constructor() {
-        this.currentStep = 0;
-    }
+export class RevealManager {
+    currentStep: number = 0;
 
     /**
      * Adim sayacini sifirla
      */
-    reset() {
+    reset(): void {
         this.currentStep = 0;
     }
 
     /**
      * Sonraki adima gec ve broadcast yap
-     * @param {object} io - Socket.io instance
      */
-    nextStep(io) {
+    nextStep(io: Server): void {
         this.currentStep++;
         log.debug({ step: this.currentStep, stepName: REVEAL_STEPS[this.currentStep] || 'Bilinmiyor' }, 'Reveal adimi');
 
@@ -49,10 +47,8 @@ class RevealManager {
 
     /**
      * Admin'e mevcut adim bilgisi gonder
-     * @param {object} io - Socket.io instance
-     * @param {number} step - Adim numarasi
      */
-    notifyAdmin(io, step) {
+    notifyAdmin(io: Server, step: number): void {
         const stepName = REVEAL_STEPS[step] || 'Bilinmiyor';
         const isFinished = step >= LAST_STEP;
 
@@ -63,5 +59,3 @@ class RevealManager {
         });
     }
 }
-
-module.exports = { RevealManager };

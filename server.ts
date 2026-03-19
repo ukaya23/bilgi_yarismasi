@@ -4,44 +4,37 @@
  * LAN tabanlı gerçek zamanlı bilgi yarışması platformu
  */
 
-const express = require('express');
-const { createServer } = require('http');
-const { Server } = require('socket.io');
-const path = require('path');
-const log = require('./src/utils/logger');
+import express from 'express';
+import { createServer } from 'http';
+import { Server } from 'socket.io';
+import path from 'path';
+import log from './src/utils/logger';
 
-// Veritabanı ve State
-const db = require('./database/postgres');
-const competitionManager = require('./src/state/competitionManager');
+import db from './database/postgres';
+import competitionManager from './src/state/competitionManager';
 
-// Event Handler'lar
-const { registerAdminHandlers } = require('./src/handlers/adminHandler');
-const { registerPlayerHandlers } = require('./src/handlers/playerHandler');
-const { registerJuryHandlers } = require('./src/handlers/juryHandler');
-const { registerScreenHandlers } = require('./src/handlers/screenHandler');
+import { registerAdminHandlers } from './src/handlers/adminHandler';
+import { registerPlayerHandlers } from './src/handlers/playerHandler';
+import { registerJuryHandlers } from './src/handlers/juryHandler';
+import { registerScreenHandlers } from './src/handlers/screenHandler';
 
-// Express Uygulaması
+import type { AuthenticatedSocket } from './src/types';
+
 const app = express();
 const httpServer = createServer(app);
 
-// Socket.io Sunucusu
 const io = new Server(httpServer, {
-    cors: {
-        origin: "*",
-        methods: ["GET", "POST"]
-    },
+    cors: { origin: "*", methods: ["GET", "POST"] },
     pingTimeout: 60000,
     pingInterval: 25000
 });
 
 // ==================== MIDDLEWARE ====================
 
-// Statik dosyalar
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 
-// Rate Limiting
-const rateLimit = require('express-rate-limit');
+import rateLimit from 'express-rate-limit';
 
 const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
@@ -63,7 +56,6 @@ app.use('/api/', apiLimiter);
 
 // ==================== ROUTES ====================
 
-// Sayfa yönlendirmeleri
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 app.get('/admin-login', (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin-login.html')));
 app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
@@ -71,12 +63,11 @@ app.get('/player', (req, res) => res.sendFile(path.join(__dirname, 'public', 'pl
 app.get('/jury', (req, res) => res.sendFile(path.join(__dirname, 'public', 'jury.html')));
 app.get('/screen', (req, res) => res.sendFile(path.join(__dirname, 'public', 'screen.html')));
 
-// API Routes
-const authRoutes = require('./src/routes/authRoutes');
-const competitionRoutes = require('./src/routes/competitionRoutes');
-const uploadRoutes = require('./src/routes/uploadRoutes');
-const settingsRoutes = require('./src/routes/settingsRoutes');
-const gameRoutes = require('./src/routes/gameRoutes');
+import authRoutes from './src/routes/authRoutes';
+import competitionRoutes from './src/routes/competitionRoutes';
+import uploadRoutes from './src/routes/uploadRoutes';
+import settingsRoutes from './src/routes/settingsRoutes';
+import gameRoutes from './src/routes/gameRoutes';
 
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/validate-code', authLimiter);
@@ -89,10 +80,10 @@ app.use('/api', gameRoutes);
 
 // ==================== SOCKET.IO ====================
 
-const { optionalSocketAuth } = require('./src/auth/socketAuth');
-io.use(optionalSocketAuth);
+import { optionalSocketAuth } from './src/auth/socketAuth';
+io.use(optionalSocketAuth as any);
 
-io.on('connection', (socket) => {
+io.on('connection', (socket: AuthenticatedSocket) => {
     log.info({ socketId: socket.id, role: socket.role || 'unauthenticated' }, 'Yeni socket baglantisi');
 
     if (socket.role) {
@@ -128,7 +119,7 @@ io.on('connection', (socket) => {
         registerScreenHandlers(io, socket, defaultGameState);
     }
 
-    socket.on('disconnect', (reason) => {
+    socket.on('disconnect', (reason: string) => {
         log.info({ socketId: socket.id, reason }, 'Socket baglantisi koptu');
     });
 });
@@ -144,11 +135,10 @@ async function startServer() {
         await db.ensureDefaultAdmin();
         competitionManager.setIO(io);
 
-        // Periyodik token temizligi (her 6 saatte bir, 7 günden eski revoked token'lari sil)
         setInterval(async () => {
             try {
                 const deleted = await db.cleanupRevokedTokens();
-                if (deleted > 0) {
+                if (deleted && deleted > 0) {
                     log.info({ deleted }, 'Eski revoked tokenlar temizlendi');
                 }
             } catch (err) {
@@ -156,7 +146,7 @@ async function startServer() {
             }
         }, 6 * 60 * 60 * 1000);
 
-        httpServer.listen(PORT, HOST, () => {
+        httpServer.listen(PORT as number, HOST, () => {
             log.info({ port: PORT, host: HOST }, 'Bilgi Yarismasi sunucusu baslatildi');
         });
     } catch (error) {
@@ -167,7 +157,6 @@ async function startServer() {
 
 startServer();
 
-// Graceful Shutdown
 process.on('SIGINT', async () => {
     log.info('Sunucu kapatiliyor (SIGINT)...');
     await db.close();

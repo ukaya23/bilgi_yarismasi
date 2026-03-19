@@ -2,23 +2,20 @@
  * Jüri Event Handler
  */
 
-const db = require('../../database/postgres');
-const { groupAnswers } = require('../state/gradingService');
-const log = require('../utils/logger');
+import type { Server, Socket } from 'socket.io';
+import db from '../../database/postgres';
+import { groupAnswers } from '../state/gradingService';
+import log from '../utils/logger';
+import type { GameState } from '../state/gameState';
 
-async function registerJuryHandlers(io, socket, gameState) {
+export async function registerJuryHandlers(io: Server, socket: Socket, gameState: GameState): Promise<void> {
     log.info({ socketId: socket.id }, 'Jury baglandi');
 
-    // Jüri odasına katıl
     socket.join('jury');
 
-    // Mevcut durumu gönder
     const currentState = gameState.getState();
-    const initPayload = {
-        gameState: currentState
-    };
+    const initPayload: any = { gameState: currentState };
 
-    // Aktif soru varsa soru verisini ekle
     if ((currentState.state === 'QUESTION_ACTIVE' || currentState.state === 'LOCKED') && gameState.currentQuestion) {
         initPayload.activeQuestion = {
             id: gameState.currentQuestion.id,
@@ -35,7 +32,6 @@ async function registerJuryHandlers(io, socket, gameState) {
         };
     }
 
-    // GRADING durumundaysa cevap verilerini tekrar gönder
     if (currentState.state === 'GRADING' && gameState.currentQuestion) {
         try {
             const answers = await db.getAnswersForQuestion(gameState.currentQuestion.id, gameState.competitionId);
@@ -57,8 +53,7 @@ async function registerJuryHandlers(io, socket, gameState) {
 
     socket.emit('INIT_DATA', initPayload);
 
-    // Grup puanlama (tüm gruba aynı puan)
-    socket.on('JURY_APPROVE_GROUP', async (data) => {
+    socket.on('JURY_APPROVE_GROUP', async (data: { answerIds: number[]; isCorrect: boolean; points: number }) => {
         try {
             const { answerIds, isCorrect, points } = data;
 
@@ -76,13 +71,12 @@ async function registerJuryHandlers(io, socket, gameState) {
             });
 
             log.info({ count: answerIds.length, isCorrect, points }, 'Jury grup puanlama');
-        } catch (error) {
+        } catch (error: any) {
             socket.emit('JURY_ACTION_RESULT', { success: false, error: error.message });
         }
     });
 
-    // Tekil cevap puanlama
-    socket.on('JURY_MANUAL_SCORE', async (data) => {
+    socket.on('JURY_MANUAL_SCORE', async (data: { answerId: number; isCorrect: boolean; points: number }) => {
         try {
             const { answerId, isCorrect, points } = data;
 
@@ -95,12 +89,11 @@ async function registerJuryHandlers(io, socket, gameState) {
             });
 
             log.info({ answerId, isCorrect, points }, 'Jury manuel puanlama');
-        } catch (error) {
+        } catch (error: any) {
             socket.emit('JURY_ACTION_RESULT', { success: false, error: error.message });
         }
     });
 
-    // Değerlendirmeyi tamamla ve sonuçları göster
     socket.on('JURY_COMMIT_RESULTS', async () => {
         try {
             await gameState.showResults();
@@ -111,27 +104,23 @@ async function registerJuryHandlers(io, socket, gameState) {
             });
 
             log.info('Jury degerlendirme tamamlandi');
-        } catch (error) {
+        } catch (error: any) {
             socket.emit('JURY_ACTION_RESULT', { success: false, error: error.message });
         }
     });
 
-    // Güncel cevapları iste
-    socket.on('JURY_REQUEST_ANSWERS', async (data) => {
+    socket.on('JURY_REQUEST_ANSWERS', async (data: { questionId: number }) => {
         try {
             const { questionId } = data;
             const answers = await db.getAnswersForQuestion(questionId, gameState.competitionId);
 
             socket.emit('JURY_ANSWERS_DATA', { questionId, answers });
-        } catch (error) {
+        } catch (error: any) {
             socket.emit('JURY_ACTION_RESULT', { success: false, error: error.message });
         }
     });
 
-    // Bağlantı kopması
     socket.on('disconnect', () => {
         log.info({ socketId: socket.id }, 'Jury ayrildi');
     });
 }
-
-module.exports = { registerJuryHandlers };

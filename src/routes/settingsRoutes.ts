@@ -1,19 +1,16 @@
 /**
  * Settings Routes
- * Handles application settings CRUD
  */
 
-const express = require('express');
+import express, { Request, Response } from 'express';
+import db from '../../database/postgres';
+import { authenticateToken, requireRole } from '../auth/authMiddleware';
+import log from '../utils/logger';
+import type { AuthenticatedRequest } from '../types';
+
 const router = express.Router();
-const db = require('../../database/postgres');
-const { authenticateToken, requireRole } = require('../auth/authMiddleware');
-const log = require('../utils/logger');
 
-/**
- * GET /api/settings
- * Get all settings
- */
-router.get('/', async (req, res) => {
+router.get('/', async (req: Request, res: Response) => {
     try {
         const settings = await db.getAllSettings();
         res.json(settings);
@@ -23,11 +20,7 @@ router.get('/', async (req, res) => {
     }
 });
 
-/**
- * PUT /api/settings/:key
- * Update a setting
- */
-router.put('/:key', authenticateToken, requireRole('admin'), async (req, res) => {
+router.put('/:key', authenticateToken as any, requireRole('admin') as any, async (req: any, res: Response) => {
     try {
         const { key } = req.params;
         const { value } = req.body;
@@ -40,4 +33,4 @@ router.put('/:key', authenticateToken, requireRole('admin'), async (req, res) =>
     }
 });
 
-module.exports = router;
+export default router;

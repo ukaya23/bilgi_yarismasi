@@ -1,28 +1,54 @@
 /**
  * Oyun Durumu Yonetimi (State Machine)
  *
- * Durumlar:
- * - IDLE: Bekleme modu
- * - QUESTION_ACTIVE: Soru yayinda, cevaplar kabul ediliyor
- * - LOCKED: Sure doldu, cevaplar kilitli
- * - GRADING: Juri degerlendirmesi (acik uclu sorular icin)
- * - REVEAL: Sonuc gosterimi
+ * Durumlar: IDLE → QUESTION_ACTIVE → LOCKED → GRADING → REVEAL
  *
  * Sorumluluklar dagitimi:
- * - GameTimer: Zamanlayici yonetimi (gameTimer.js)
- * - GradingService: Puanlama ve cevap gruplama (gradingService.js)
- * - RevealManager: Sonuc gosterim adimlari (revealManager.js)
+ * - GameTimer: Zamanlayici yonetimi
+ * - GradingService: Puanlama ve cevap gruplama
+ * - RevealManager: Sonuc gosterim adimlari
  * - GameState: State machine, orkestrasyon, cevap gonderimi
  */
 
-const db = require('../../database/postgres');
-const log = require('../utils/logger');
-const { GameTimer } = require('./gameTimer');
-const gradingService = require('./gradingService');
-const { RevealManager } = require('./revealManager');
+import type { Server } from 'socket.io';
+import db from '../../database/postgres';
+import log from '../utils/logger';
+import { GameTimer } from './gameTimer';
+import * as gradingService from './gradingService';
+import { RevealManager } from './revealManager';
+import type { GamePhase, Question } from '../types';
 
-class GameState {
-    constructor(competitionId = 1) {
+export interface CurrentQuestion extends Question {
+    index: number;
+    total: number;
+}
+
+interface JuryGrade {
+    answerId: number;
+    isCorrect: boolean;
+    points: number;
+}
+
+const VALID_TRANSITIONS: Record<GamePhase, GamePhase[]> = {
+    'IDLE': ['QUESTION_ACTIVE'],
+    'QUESTION_ACTIVE': ['LOCKED'],
+    'LOCKED': ['GRADING', 'REVEAL'],
+    'GRADING': ['REVEAL'],
+    'REVEAL': ['IDLE', 'QUESTION_ACTIVE']
+};
+
+export class GameState {
+    competitionId: number;
+    state: GamePhase;
+    currentQuestion: CurrentQuestion | null;
+    questionStartTime: number | null;
+    questions: Question[];
+    answeredPlayers: Set<number>;
+    io: Server | null;
+    gameTimer: GameTimer;
+    revealManager: RevealManager;
+
+    constructor(competitionId: number = 1) {
         this.competitionId = competitionId;
         this.state = 'IDLE';
         this.currentQuestion = null;
@@ -31,28 +57,18 @@ class GameState {
         this.answeredPlayers = new Set();
         this.io = null;
 
-        // Composition
         this.gameTimer = new GameTimer();
         this.revealManager = new RevealManager();
     }
 
-    /**
-     * Socket.io referansini ayarla
-     */
-    setIO(io) {
+    setIO(io: Server): void {
         this.io = io;
     }
 
-    /**
-     * timeRemaining getter - GameTimer'a delege eder
-     */
-    get timeRemaining() {
+    get timeRemaining(): number {
         return this.gameTimer.timeRemaining;
     }
 
-    /**
-     * Mevcut durumu getir
-     */
     getState() {
         return {
             competitionId: this.competitionId,
@@ -63,19 +79,8 @@ class GameState {
         };
     }
 
-    /**
-     * Durumu degistir ve tum istemcilere bildir
-     */
-    async setState(newState) {
-        const validTransitions = {
-            'IDLE': ['QUESTION_ACTIVE'],
-            'QUESTION_ACTIVE': ['LOCKED'],
-            'LOCKED': ['GRADING', 'REVEAL'],
-            'GRADING': ['REVEAL'],
-            'REVEAL': ['IDLE', 'QUESTION_ACTIVE']
-        };
-
-        const allowed = validTransitions[this.state];
+    async setState(newState: GamePhase): Promise<void> {
+        const allowed = VALID_TRANSITIONS[this.state];
         if (allowed && !allowed.includes(newState)) {
             log.warn({ from: this.state, to: newState }, 'Gecersiz state gecisi');
         }
@@ -90,19 +95,14 @@ class GameState {
         log.info({ state: newState }, 'Durum degisti');
     }
 
-    /**
-     * Yeni soru baslat
-     */
-    async startQuestion(questionId) {
+    async startQuestion(questionId: number): Promise<void> {
         const question = await db.getQuestionById(questionId);
         if (!question) {
             throw new Error('Soru bulunamadi');
         }
 
-        // Onceki timer'i temizle
         this.gameTimer.stop();
 
-        // Sorunun sirasini ve toplam soru sayisini bul
         const allQuestions = await db.getAllQuestions();
         const questionIndex = allQuestions.findIndex(q => q.id === question.id) + 1;
         const totalQuestions = allQuestions.length;
@@ -119,7 +119,6 @@ class GameState {
 
         await this.setState('QUESTION_ACTIVE');
 
-        // Yarismacilara ve juriye soruyu gonder
         if (this.io) {
             this.io.to('player').emit('NEW_QUESTION', {
                 id: this.currentQuestion.id,
@@ -145,7 +144,6 @@ class GameState {
                 total: totalQuestions
             });
 
-            // Seyirciye maskelenmis soru gonder
             const quote = await db.getRandomQuote();
             this.io.to('screen').emit('MASKED_QUESTION', {
                 category: this.currentQuestion.category || 'Genel Kultur',
@@ -158,10 +156,9 @@ class GameState {
             });
         }
 
-        // Zamanlayiciyi baslat
         this.gameTimer.start(
             question.duration,
-            (timeRemaining) => {
+            (timeRemaining: number) => {
                 if (this.io) {
                     this.io.emit('TIME_SYNC', {
                         timeRemaining,
@@ -173,26 +170,21 @@ class GameState {
         );
     }
 
-    /**
-     * Soruyu kilitle (sure doldu)
-     */
-    async lockQuestion() {
+    async lockQuestion(): Promise<void> {
         this.gameTimer.clear();
 
         await this.setState('LOCKED');
 
-        // Acik uclu soruysa juri degerlendirmesine gec
         if (this.currentQuestion && this.currentQuestion.type === 'OPEN_ENDED') {
             setTimeout(async () => {
                 await this.startGrading();
             }, 1000);
         } else {
-            // Coktan secmeli ise otomatik puanla
             await gradingService.autoGradeMultipleChoice(
-                this.currentQuestion.id,
+                this.currentQuestion!.id,
                 this.competitionId,
-                this.currentQuestion.correct_keys,
-                this.currentQuestion.points
+                this.currentQuestion!.correct_keys,
+                this.currentQuestion!.points
             );
 
             setTimeout(async () => {
@@ -201,10 +193,7 @@ class GameState {
         }
     }
 
-    /**
-     * Juri degerlendirmesini baslat
-     */
-    async startGrading() {
+    async startGrading(): Promise<void> {
         await this.setState('GRADING');
 
         if (!this.currentQuestion || !this.io) return;
@@ -224,10 +213,7 @@ class GameState {
         });
     }
 
-    /**
-     * Cevap gonderimini isle
-     */
-    async submitAnswer(contestantId, answerText, timeRemaining) {
+    async submitAnswer(contestantId: number, answerText: string, timeRemaining?: number): Promise<{ success: boolean; message?: string; id?: number }> {
         if (this.state !== 'QUESTION_ACTIVE') {
             return { success: false, message: 'Cevap kabul edilmiyor' };
         }
@@ -261,19 +247,13 @@ class GameState {
         return result;
     }
 
-    /**
-     * Juri puanlamasini uygula
-     */
-    async applyJuryGrades(grades) {
+    async applyJuryGrades(grades: JuryGrade[]): Promise<void> {
         for (const grade of grades) {
             await db.gradeAnswer(grade.answerId, grade.isCorrect, grade.points);
         }
     }
 
-    /**
-     * Sonuclari goster
-     */
-    async showResults() {
+    async showResults(): Promise<void> {
         await this.setState('REVEAL');
         this.revealManager.reset();
 
@@ -300,18 +280,12 @@ class GameState {
         }
     }
 
-    /**
-     * Manuel modda bir sonraki adima gec
-     */
-    nextRevealStep() {
+    nextRevealStep(): void {
         if (this.state !== 'REVEAL') return;
-        this.revealManager.nextStep(this.io);
+        this.revealManager.nextStep(this.io!);
     }
 
-    /**
-     * Bekleme moduna don
-     */
-    async goToIdle() {
+    async goToIdle(): Promise<void> {
         this.gameTimer.stop();
 
         this.currentQuestion = null;
@@ -321,17 +295,11 @@ class GameState {
         await this.setState('IDLE');
     }
 
-    /**
-     * Zamanlayiciyi durdur (CompetitionManager cleanup icin)
-     */
-    stopTimer() {
+    stopTimer(): void {
         this.gameTimer.stop();
     }
 
-    /**
-     * Oyunu sifirla
-     */
-    async resetGame() {
+    async resetGame(): Promise<void> {
         await this.goToIdle();
         await db.resetAllContestants(this.competitionId);
 
@@ -346,5 +314,3 @@ class GameState {
         log.info({ competitionId: this.competitionId }, 'Oyun sifirlandi');
     }
 }
-
-module.exports = { GameState };

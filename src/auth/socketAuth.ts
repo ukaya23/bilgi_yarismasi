@@ -2,23 +2,19 @@
  * Socket.io JWT Authentication Middleware
  */
 
-const { verifyToken } = require('./jwtUtils');
-const db = require('../../database/postgres');
-const log = require('../utils/logger');
+import { verifyToken } from './jwtUtils';
+import db from '../../database/postgres';
+import log from '../utils/logger';
+import type { AuthenticatedSocket } from '../types';
 
-/**
- * Socket.io middleware for JWT authentication
- * Extracts token from auth object or handshake query
- */
-async function socketAuthMiddleware(socket, next) {
+export async function socketAuthMiddleware(socket: AuthenticatedSocket, next: (err?: Error) => void): Promise<void> {
     try {
-        // Try to get token from auth header or query string
-        let token = null;
+        let token: string | null = null;
 
         if (socket.handshake.auth && socket.handshake.auth.token) {
             token = socket.handshake.auth.token;
         } else if (socket.handshake.query && socket.handshake.query.token) {
-            token = socket.handshake.query.token;
+            token = socket.handshake.query.token as string;
         } else if (socket.handshake.headers.authorization) {
             const authHeader = socket.handshake.headers.authorization;
             const parts = authHeader.split(' ');
@@ -31,23 +27,18 @@ async function socketAuthMiddleware(socket, next) {
             return next(new Error('Authentication token required'));
         }
 
-        // Verify token
         const decoded = verifyToken(token);
 
-        // Check if token is revoked
         const isRevoked = await db.isTokenRevokedOrUserBanned(decoded.tokenId, decoded.userId, decoded.iat);
         if (isRevoked) {
             return next(new Error('Token has been revoked'));
         }
 
-        // Attach user info to socket
         socket.userId = decoded.userId;
         socket.username = decoded.username;
         socket.role = decoded.role;
         socket.competitionId = decoded.competitionId;
-        socket.tokenId = decoded.tokenId;
 
-        // Also store in data object for easy access
         socket.data.user = {
             userId: decoded.userId,
             username: decoded.username,
@@ -63,12 +54,8 @@ async function socketAuthMiddleware(socket, next) {
     }
 }
 
-/**
- * Require specific role for socket connection
- * @param {...string} roles - Allowed roles
- */
-function requireSocketRole(...roles) {
-    return (socket, next) => {
+export function requireSocketRole(...roles: string[]) {
+    return (socket: AuthenticatedSocket, next: (err?: Error) => void): void => {
         if (!socket.role || !roles.includes(socket.role)) {
             return next(new Error('Insufficient permissions'));
         }
@@ -76,17 +63,14 @@ function requireSocketRole(...roles) {
     };
 }
 
-/**
- * Optional socket authentication - doesn't fail if no token
- */
-async function optionalSocketAuth(socket, next) {
+export async function optionalSocketAuth(socket: AuthenticatedSocket, next: (err?: Error) => void): Promise<void> {
     try {
-        let token = null;
+        let token: string | null = null;
 
         if (socket.handshake.auth && socket.handshake.auth.token) {
             token = socket.handshake.auth.token;
         } else if (socket.handshake.query && socket.handshake.query.token) {
-            token = socket.handshake.query.token;
+            token = socket.handshake.query.token as string;
         }
 
         if (token) {
@@ -98,7 +82,6 @@ async function optionalSocketAuth(socket, next) {
                 socket.username = decoded.username;
                 socket.role = decoded.role;
                 socket.competitionId = decoded.competitionId;
-                socket.tokenId = decoded.tokenId;
 
                 socket.data.user = {
                     userId: decoded.userId,
@@ -112,13 +95,6 @@ async function optionalSocketAuth(socket, next) {
 
         next();
     } catch (error) {
-        // Continue without auth
         next();
     }
 }
-
-module.exports = {
-    socketAuthMiddleware,
-    requireSocketRole,
-    optionalSocketAuth
-};

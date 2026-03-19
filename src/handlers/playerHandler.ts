@@ -2,28 +2,26 @@
  * Yarışmacı Event Handler
  */
 
-const db = require('../../database/postgres');
-const log = require('../utils/logger');
+import type { Server, Socket } from 'socket.io';
+import db from '../../database/postgres';
+import log from '../utils/logger';
+import type { GameState } from '../state/gameState';
 
-// Socket ID -> Contestant ID mapping (reconnect için)
-const socketContestantMap = new Map();
+interface PlayerSocket extends Socket {
+    contestantId?: number | null;
+}
 
-function registerPlayerHandlers(io, socket, gameState) {
+const socketContestantMap = new Map<string, number>();
+
+export function registerPlayerHandlers(io: Server, socket: PlayerSocket, gameState: GameState): void {
     log.info({ socketId: socket.id }, 'Player baglandi');
 
-    // Socket'e contestant bilgisini ekle
     socket.contestantId = null;
-
-    // Player odasına hemen katıl (login olmasa bile eventleri alabilsin)
     socket.join('player');
 
-    // İlk durumu gönder (PLAYER_LOGIN tetiklemesi için gerekli)
     const currentState = gameState.getState();
-    const initPayload = {
-        gameState: currentState
-    };
+    const initPayload: any = { gameState: currentState };
 
-    // Aktif soru varsa soru verisini de ekle
     if (currentState.state === 'QUESTION_ACTIVE' && gameState.currentQuestion) {
         initPayload.activeQuestion = {
             id: gameState.currentQuestion.id,
@@ -41,8 +39,7 @@ function registerPlayerHandlers(io, socket, gameState) {
 
     socket.emit('INIT_DATA', initPayload);
 
-    // Giriş
-    socket.on('PLAYER_LOGIN', async (data) => {
+    socket.on('PLAYER_LOGIN', async (data: { name: string; tableNo: string | number }) => {
         try {
             const { name, tableNo } = data;
 
@@ -51,42 +48,34 @@ function registerPlayerHandlers(io, socket, gameState) {
                 return;
             }
 
-            // Yarışmacıyı veritabanına ekle/güncelle
             const competitionId = gameState.competitionId;
-            const contestantId = await db.upsertContestant(name, parseInt(tableNo), competitionId);
+            const contestantId = await db.upsertContestant(name, parseInt(String(tableNo)), competitionId);
             await db.updateContestantSocket(contestantId, socket.id);
 
-            // Socket'e contestant ID'yi kaydet
             socket.contestantId = contestantId;
-
-            // Mapping'e de ekle (reconnect için)
             socketContestantMap.set(socket.id, contestantId);
 
-            // Başarılı giriş bildirimi
             socket.emit('LOGIN_RESULT', {
                 success: true,
                 contestantId,
                 name,
-                tableNo: parseInt(tableNo)
+                tableNo: parseInt(String(tableNo))
             });
 
-            // Mevcut oyun durumunu gönder
             socket.emit('GAME_STATE', gameState.getState());
 
-            // Tüm admin ve seyircilere bildir
             const contestants = await db.getAllContestants(competitionId);
             io.to('admin').emit('CONTESTANTS_UPDATED', contestants);
             io.to('screen').emit('CONTESTANTS_UPDATED', contestants);
 
             log.info({ name, tableNo, contestantId }, 'Player giris basarili');
-        } catch (error) {
+        } catch (error: any) {
             log.error({ err: error }, 'Player login hatasi');
             socket.emit('LOGIN_RESULT', { success: false, error: error.message });
         }
     });
 
-    // Cevap gönder
-    socket.on('PLAYER_SUBMIT_ANSWER', async (data) => {
+    socket.on('PLAYER_SUBMIT_ANSWER', async (data: { answer: string; timeRemaining?: number }) => {
         try {
             const contestantId = socket.contestantId;
 
@@ -110,18 +99,16 @@ function registerPlayerHandlers(io, socket, gameState) {
             } else {
                 log.debug({ contestantId, message: result.message }, 'Cevap basarisiz');
             }
-        } catch (error) {
+        } catch (error: any) {
             log.error({ err: error }, 'Cevap gonderme hatasi');
             socket.emit('ANSWER_RESULT', { success: false, error: error.message });
         }
     });
 
-    // Heartbeat (bağlantı kontrolü)
     socket.on('PLAYER_HEARTBEAT', () => {
         socket.emit('HEARTBEAT_ACK', { timestamp: Date.now() });
     });
 
-    // Bağlantı kopması
     socket.on('disconnect', async () => {
         const contestantId = socket.contestantId;
         if (contestantId) {
@@ -134,5 +121,3 @@ function registerPlayerHandlers(io, socket, gameState) {
         }
     });
 }
-
-module.exports = { registerPlayerHandlers };
