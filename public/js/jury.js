@@ -48,6 +48,13 @@ async function validateExistingSession() {
                 slotNumber: data.slotNumber,
                 competitionName: data.competitionName
             };
+            // Taze JWT token'ları kaydet (socket auth için)
+            if (data.accessToken) {
+                localStorage.setItem('juryAccessToken', data.accessToken);
+            }
+            if (data.refreshToken) {
+                localStorage.setItem('juryRefreshToken', data.refreshToken);
+            }
             return true;
         }
     } catch (error) {
@@ -127,6 +134,14 @@ async function login() {
 
             sessionToken = data.sessionToken;
             localStorage.setItem('jurySessionToken', sessionToken);
+
+            // JWT token'ları kaydet (socket auth için)
+            if (data.accessToken) {
+                localStorage.setItem('juryAccessToken', data.accessToken);
+            }
+            if (data.refreshToken) {
+                localStorage.setItem('juryRefreshToken', data.refreshToken);
+            }
 
             juryData = {
                 name: data.name,
@@ -406,7 +421,7 @@ function renderAnswerGroup(groupType, answers) {
         item.innerHTML = `
             <div class="answer-info">
                 <div class="answer-contestant">
-                    <span class="contestant-table">Masa ${answer.table_no}</span>
+                    <span class="contestant-table">Masa ${escapeHtml(String(answer.table_no))}</span>
                     <span class="contestant-name">${escapeHtml(answer.name)}</span>
                 </div>
                 <div class="answer-text">${escapeHtml(answer.answer_text || '(Boş)')}</div>

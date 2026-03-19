@@ -403,8 +403,8 @@ function updateQuestionsUI() {
 
         tr.innerHTML = `
             <td>${q.id}</td>
-            <td>${q.category || '-'}</td>
-            <td>${hasImage}${truncate(q.content, 50)}</td>
+            <td>${escapeHtml(q.category || '-')}</td>
+            <td>${hasImage}${escapeHtml(truncate(q.content, 50))}</td>
             <td>${typeHtml}</td>
             <td>${q.points}</td>
             <td>${q.duration}s</td>
@@ -435,8 +435,8 @@ function updateContestantsUI() {
         card.className = `contestant-card ${c.status.toLowerCase()}`;
         card.id = `contestant-${c.id}`;
         card.innerHTML = `
-            <div class="contestant-table">${c.table_no}</div>
-            <div class="contestant-name">${c.name}</div>
+            <div class="contestant-table">${escapeHtml(String(c.table_no))}</div>
+            <div class="contestant-name">${escapeHtml(c.name)}</div>
             <div class="contestant-score">${c.total_score} puan</div>
         `;
         grid.appendChild(card);
@@ -450,10 +450,10 @@ function updateContestantsUI() {
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td>${c.id}</td>
-            <td>${c.table_no}</td>
-            <td>${c.name}</td>
+            <td>${escapeHtml(String(c.table_no))}</td>
+            <td>${escapeHtml(c.name)}</td>
             <td>${c.total_score}</td>
-            <td><span class="badge ${c.status === 'ONLINE' ? 'badge-success' : 'badge-danger'}">${c.status}</span></td>
+            <td><span class="badge ${c.status === 'ONLINE' ? 'badge-success' : 'badge-danger'}">${escapeHtml(c.status)}</span></td>
         `;
         tbody.appendChild(tr);
     });
@@ -473,8 +473,8 @@ function updateLeaderboard(leaderboard) {
         const rankEmoji = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}`;
         tr.innerHTML = `
             <td>${rankEmoji}</td>
-            <td>${entry.table_no}</td>
-            <td>${entry.name}</td>
+            <td>${escapeHtml(String(entry.table_no))}</td>
+            <td>${escapeHtml(entry.name)}</td>
             <td><strong>${entry.total_score}</strong></td>
         `;
         tbody.appendChild(tr);
@@ -763,42 +763,32 @@ function renderCompetitionInfo() {
     const contestantCodes = competitionCodes.filter(c => c.role === 'CONTESTANT');
     const juryCodes = competitionCodes.filter(c => c.role === 'JURY');
 
+    const renderCodeCards = (codes) => codes.map(c => `
+        <div class="code-card ${c.is_used ? 'used' : ''}">
+            <div class="code-value">${escapeHtml(c.code)}</div>
+            <input type="text" class="code-name-input" value="${escapeHtml(c.name)}"
+                   onchange="updateCodeName(${c.id}, this.value)" placeholder="İsim girin">
+            <div class="code-status">${c.is_used ? '✅ Giriş yapıldı' : '⏳ Bekliyor'}</div>
+            ${c.is_used ? `<button class="btn btn-sm btn-secondary" onclick="resetCode(${c.id})">Sıfırla</button>` : ''}
+        </div>
+    `).join('');
+
     container.innerHTML = `
         <div class="competition-header">
-            <h3>📋 ${activeCompetition.name}</h3>
+            <h3>📋 ${escapeHtml(activeCompetition.name)}</h3>
             <span class="badge badge-success">Aktif</span>
         </div>
-        
+
         <div class="codes-section">
             <h4>👥 Yarışmacı Kodları</h4>
-            <div class="codes-grid">
-                ${contestantCodes.map(c => `
-                    <div class="code-card ${c.is_used ? 'used' : ''}">
-                        <div class="code-value">${c.code}</div>
-                        <input type="text" class="code-name-input" value="${c.name}" 
-                               onchange="updateCodeName(${c.id}, this.value)" placeholder="İsim girin">
-                        <div class="code-status">${c.is_used ? '✅ Giriş yapıldı' : '⏳ Bekliyor'}</div>
-                        ${c.is_used ? `<button class="btn btn-sm btn-secondary" onclick="resetCode(${c.id})">Sıfırla</button>` : ''}
-                    </div>
-                `).join('')}
-            </div>
+            <div class="codes-grid">${renderCodeCards(contestantCodes)}</div>
         </div>
-        
+
         <div class="codes-section">
             <h4>⚖️ Jüri Kodları</h4>
-            <div class="codes-grid">
-                ${juryCodes.map(c => `
-                    <div class="code-card ${c.is_used ? 'used' : ''}">
-                        <div class="code-value">${c.code}</div>
-                        <input type="text" class="code-name-input" value="${c.name}" 
-                               onchange="updateCodeName(${c.id}, this.value)" placeholder="İsim girin">
-                        <div class="code-status">${c.is_used ? '✅ Giriş yapıldı' : '⏳ Bekliyor'}</div>
-                        ${c.is_used ? `<button class="btn btn-sm btn-secondary" onclick="resetCode(${c.id})">Sıfırla</button>` : ''}
-                    </div>
-                `).join('')}
-            </div>
+            <div class="codes-grid">${renderCodeCards(juryCodes)}</div>
         </div>
-        
+
         <button class="btn btn-danger mt-2" onclick="endCompetition()">Yarışmayı Sonlandır</button>
     `;
 }
@@ -825,23 +815,17 @@ async function createCompetition() {
     }
 
     try {
-        const currentToken = localStorage.getItem('adminAccessToken') || localStorage.getItem('adminToken') || adminToken;
         const response = await fetch('/api/competition', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-Admin-Token': currentToken
+                'Authorization': `Bearer ${adminToken}`
             },
             body: JSON.stringify({ name, contestantCount, juryCount })
         });
 
         if (response.status === 401) {
-            showToast('Oturumunuz süresi dolmuş. Giriş sayfasına yönlendiriliyorsunuz.', 'error');
-            setTimeout(() => {
-                localStorage.removeItem('adminToken');
-                localStorage.removeItem('adminAccessToken');
-                window.location.href = '/admin-login';
-            }, 2000);
+            handleAuthExpired();
             return;
         }
 
@@ -866,7 +850,7 @@ async function updateCodeName(codeId, name) {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
-                'X-Admin-Token': adminToken
+                'Authorization': `Bearer ${adminToken}`
             },
             body: JSON.stringify({ name })
         });
@@ -881,7 +865,7 @@ async function resetCode(codeId) {
     try {
         await fetch(`/api/competition/code/${codeId}/reset`, {
             method: 'POST',
-            headers: { 'X-Admin-Token': adminToken }
+            headers: { 'Authorization': `Bearer ${adminToken}` }
         });
         loadActiveCompetition();
         showToast('Kod sıfırlandı', 'success');
@@ -894,19 +878,13 @@ async function endCompetition() {
     if (!confirm('Yarışmayı sonlandırmak istediğinize emin misiniz?')) return;
 
     try {
-        const currentToken = localStorage.getItem('adminAccessToken') || localStorage.getItem('adminToken');
         const response = await fetch('/api/competition/end', {
             method: 'POST',
-            headers: { 'X-Admin-Token': currentToken }
+            headers: { 'Authorization': `Bearer ${adminToken}` }
         });
 
         if (response.status === 401) {
-            showToast('Oturumunuz süresi dolmuş. Giriş sayfasına yönlendiriliyorsunuz.', 'error');
-            setTimeout(() => {
-                localStorage.removeItem('adminToken');
-                localStorage.removeItem('adminAccessToken');
-                window.location.href = '/admin-login';
-            }, 2000);
+            handleAuthExpired();
             return;
         }
 
@@ -1035,7 +1013,7 @@ async function saveSettings() {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-Admin-Token': adminToken
+                    'Authorization': `Bearer ${adminToken}`
                 },
                 body: JSON.stringify({ value })
             });
@@ -1052,14 +1030,76 @@ async function saveSettings() {
 // ==================== LOGOUT ====================
 
 function logout() {
-    fetch('/api/auth/admin-logout', {
+    fetch('/api/auth/logout', {
         method: 'POST',
-        headers: { 'X-Admin-Token': adminToken }
+        headers: { 'Authorization': `Bearer ${adminToken}` }
     }).finally(() => {
-        localStorage.removeItem('adminToken');
-        localStorage.removeItem('adminUsername');
+        localStorage.removeItem('adminAccessToken');
+        localStorage.removeItem('adminRefreshToken');
         window.location.href = '/admin-login';
     });
+}
+
+async function changePassword() {
+    const currentPassword = document.getElementById('currentPassword').value;
+    const newPassword = document.getElementById('newPassword').value;
+    const confirmPassword = document.getElementById('confirmPassword').value;
+
+    if (!currentPassword || !newPassword || !confirmPassword) {
+        showToast('Tüm alanları doldurun', 'error');
+        return;
+    }
+
+    if (newPassword.length < 8) {
+        showToast('Yeni şifre en az 8 karakter olmalıdır', 'error');
+        return;
+    }
+
+    if (newPassword !== confirmPassword) {
+        showToast('Yeni şifreler eşleşmiyor', 'error');
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/auth/change-password', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${adminToken}`
+            },
+            body: JSON.stringify({ currentPassword, newPassword })
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.success) {
+            // Yeni token'ları kaydet
+            adminToken = data.accessToken;
+            localStorage.setItem('adminAccessToken', data.accessToken);
+            localStorage.setItem('adminRefreshToken', data.refreshToken);
+
+            // Formu temizle
+            document.getElementById('currentPassword').value = '';
+            document.getElementById('newPassword').value = '';
+            document.getElementById('confirmPassword').value = '';
+
+            showToast('Şifre başarıyla değiştirildi', 'success');
+        } else {
+            showToast(data.error || 'Şifre değiştirilemedi', 'error');
+        }
+    } catch (error) {
+        console.error('Şifre değiştirme hatası:', error);
+        showToast('Sunucu hatası', 'error');
+    }
+}
+
+function handleAuthExpired() {
+    showToast('Oturumunuz süresi dolmuş. Giriş sayfasına yönlendiriliyorsunuz.', 'error');
+    setTimeout(() => {
+        localStorage.removeItem('adminAccessToken');
+        localStorage.removeItem('adminRefreshToken');
+        window.location.href = '/admin-login';
+    }, 2000);
 }
 
 // ==================== IMAGE UPLOAD ====================
@@ -1102,12 +1142,10 @@ async function handleImageSelect(e) {
         const formData = new FormData();
         formData.append('image', file);
 
-        const currentToken = localStorage.getItem('adminAccessToken') || localStorage.getItem('adminToken') || adminToken;
-
         const response = await fetch('/api/upload', {
             method: 'POST',
             headers: {
-                'X-Admin-Token': currentToken
+                'Authorization': `Bearer ${adminToken}`
             },
             body: formData
         });
@@ -1172,10 +1210,9 @@ async function removeImage() {
         // Sunucudan sil
         const filename = mediaUrl.split('/').pop();
         try {
-            const currentToken = localStorage.getItem('adminAccessToken') || localStorage.getItem('adminToken') || adminToken;
             await fetch(`/api/upload/${filename}`, {
                 method: 'DELETE',
-                headers: { 'X-Admin-Token': currentToken }
+                headers: { 'Authorization': `Bearer ${adminToken}` }
             });
         } catch (error) {
             console.error('Resim silme hatası:', error);

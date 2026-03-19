@@ -66,51 +66,37 @@ const io = new Server(httpServer, {
     pingInterval: 25000
 });
 
-// Admin oturum deposu (basit in-memory)
-const adminSessions = new Map();
-
 // ==================== MIDDLEWARE ====================
 
 // Statik dosyalar
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 
-const { verifyToken } = require('./src/auth/jwtUtils');
+// Rate Limiting
+const rateLimit = require('express-rate-limit');
 
-// Admin oturum kontrolü middleware
-function requireAdminAuth(req, res, next) {
-    console.log('[AUTH DEBUG] requireAdminAuth called for URL:', req.originalUrl || req.url);
+// Auth endpoint'leri için sıkı limit (brute force koruması)
+const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 dakika
+    max: 20, // 15 dakikada max 20 istek
+    message: { error: 'Çok fazla giriş denemesi. 15 dakika sonra tekrar deneyin.' },
+    standardHeaders: true,
+    legacyHeaders: false
+});
 
-    // Frontend X-Admin-Token üzerinden gönderiyor
-    const token = req.headers['x-admin-token'] || (req.headers.authorization && req.headers.authorization.split(' ')[1]);
+// Genel API limiti
+const apiLimiter = rateLimit({
+    windowMs: 1 * 60 * 1000, // 1 dakika
+    max: 100, // dakikada max 100 istek
+    message: { error: 'Çok fazla istek. Lütfen biraz bekleyin.' },
+    standardHeaders: true,
+    legacyHeaders: false
+});
 
-    console.log('[AUTH DEBUG] Extracted Token:', token ? token.substring(0, 15) + '...' : 'NULL OR UNDEFINED');
+app.use('/api/', apiLimiter);
 
-    if (!token) {
-        console.log('[AUTH DEBUG] No token provided in headers!');
-        return res.status(401).json({ error: 'Yetkisiz erişim - Token yok' });
-    }
-
-    try {
-        const decoded = verifyToken(token);
-        if (decoded.role !== 'admin') {
-            console.log('[AUTH DEBUG] Token valid but role is not admin:', decoded.role);
-            return res.status(403).json({ error: 'Yetkisiz erişim: Yönetici rolü gerekli' });
-        }
-        req.admin = { id: decoded.userId, username: decoded.username };
-        console.log('[AUTH DEBUG] Success for user:', req.admin.username);
-        next();
-    } catch (error) {
-        console.error('[AUTH DEBUG] JWT verification failed:', error.message);
-        // Eski memory map üzerinden fallback (gerekliyse)
-        if (adminSessions && adminSessions.has(token)) {
-            req.admin = adminSessions.get(token);
-            console.log('[AUTH DEBUG] Fallback to memory session success for:', req.admin.username);
-            return next();
-        }
-        return res.status(401).json({ error: 'Oturum süresi dolmuş veya geçersiz token' });
-    }
-}
+const { verifyToken, generateTokenPair } = require('./src/auth/jwtUtils');
+const { authenticateToken, requireRole } = require('./src/auth/authMiddleware');
 
 // ==================== ROUTES ====================
 
@@ -146,62 +132,16 @@ app.get('/screen', (req, res) => {
 
 // ==================== JWT AUTH ROUTES ====================
 const authRoutes = require('./src/routes/authRoutes');
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/validate-code', authLimiter);
+app.use('/api/auth/change-password', authLimiter);
 app.use('/api/auth', authRoutes);
 
 // ==================== COMPETITION ROUTES ====================
 const competitionRoutes = require('./src/routes/competitionRoutes');
 app.use('/api/competitions', competitionRoutes);
 
-// ==================== AUTH API ROUTES (LEGACY - will be deprecated) ====================
-
-// Admin Login
-app.post('/api/auth/admin-login', async (req, res) => {
-    try {
-        const { username, password } = req.body;
-
-        if (!username || !password) {
-            return res.status(400).json({ error: 'Kullanıcı adı ve şifre gerekli' });
-        }
-
-        const admin = await db.authenticateAdmin(username, password);
-
-        if (!admin) {
-            return res.status(401).json({ error: 'Geçersiz kullanıcı adı veya şifre' });
-        }
-
-        const token = uuidv4();
-        adminSessions.set(token, { id: admin.id, username: admin.username });
-
-        res.json({
-            success: true,
-            token,
-            username: admin.username
-        });
-    } catch (error) {
-        console.error('Admin login hatası:', error);
-        res.status(500).json({ error: 'Sunucu hatası' });
-    }
-});
-
-// Admin Logout
-app.post('/api/auth/admin-logout', (req, res) => {
-    const token = req.headers['x-admin-token'];
-    if (token) {
-        adminSessions.delete(token);
-    }
-    res.json({ success: true });
-});
-
-// Admin oturum kontrolü
-app.get('/api/auth/check-admin', (req, res) => {
-    const token = req.headers['x-admin-token'];
-    if (token && adminSessions.has(token)) {
-        const admin = adminSessions.get(token);
-        res.json({ authenticated: true, username: admin.username });
-    } else {
-        res.json({ authenticated: false });
-    }
-});
+// ==================== ACCESS CODE AUTH ROUTES ====================
 
 // Erişim kodu doğrulama (Yarışmacı/Jüri)
 app.post('/api/auth/validate-code', async (req, res) => {
@@ -222,13 +162,24 @@ app.post('/api/auth/validate-code', async (req, res) => {
         const sessionToken = uuidv4();
         await db.markCodeAsUsed(result.accessCode.id, sessionToken);
 
+        // JWT token pair oluştur
+        const jwtRole = result.accessCode.role === 'CONTESTANT' ? 'player' : 'jury';
+        const tokens = generateTokenPair({
+            id: result.accessCode.slot_number,
+            username: result.accessCode.name,
+            role: jwtRole,
+            competitionId: result.accessCode.competition_id
+        });
+
         res.json({
             success: true,
             sessionToken,
             role: result.accessCode.role,
             name: result.accessCode.name,
             slotNumber: result.accessCode.slot_number,
-            competitionName: result.accessCode.competition_name
+            competitionName: result.accessCode.competition_name,
+            accessToken: tokens.accessToken,
+            refreshToken: tokens.refreshToken
         });
     } catch (error) {
         console.error('Kod doğrulama hatası:', error);
@@ -251,12 +202,23 @@ app.post('/api/auth/validate-session', async (req, res) => {
             return res.json({ valid: false });
         }
 
+        // Taze JWT token pair oluştur
+        const jwtRole = accessCode.role === 'CONTESTANT' ? 'player' : 'jury';
+        const tokens = generateTokenPair({
+            id: accessCode.slot_number,
+            username: accessCode.name,
+            role: jwtRole,
+            competitionId: accessCode.competition_id
+        });
+
         res.json({
             valid: true,
             role: accessCode.role,
             name: accessCode.name,
             slotNumber: accessCode.slot_number,
-            competitionName: accessCode.competition_name
+            competitionName: accessCode.competition_name,
+            accessToken: tokens.accessToken,
+            refreshToken: tokens.refreshToken
         });
     } catch (error) {
         console.error('Session doğrulama hatası:', error);
@@ -267,7 +229,7 @@ app.post('/api/auth/validate-session', async (req, res) => {
 // ==================== COMPETITION API ROUTES ====================
 
 // Yarışma oluştur
-app.post('/api/competition', requireAdminAuth, async (req, res) => {
+app.post('/api/competition', authenticateToken, requireRole('admin'), async (req, res) => {
     try {
         const { name, contestantCount, juryCount } = req.body;
 
@@ -302,7 +264,7 @@ app.post('/api/competition', requireAdminAuth, async (req, res) => {
 });
 
 // Yarışmayı sonlandır
-app.post('/api/competition/end', requireAdminAuth, async (req, res) => {
+app.post('/api/competition/end', authenticateToken, requireRole('admin'), async (req, res) => {
     try {
         const activeCompetition = await db.getActiveCompetition();
         if (activeCompetition) {
@@ -341,7 +303,7 @@ app.get('/api/competition/active', async (req, res) => {
 });
 
 // Erişim kodu ismini güncelle
-app.put('/api/competition/code/:id', requireAdminAuth, async (req, res) => {
+app.put('/api/competition/code/:id', authenticateToken, requireRole('admin'), async (req, res) => {
     try {
         const { id } = req.params;
         const { name } = req.body;
@@ -359,7 +321,7 @@ app.put('/api/competition/code/:id', requireAdminAuth, async (req, res) => {
 });
 
 // Erişim kodunu sıfırla
-app.post('/api/competition/code/:id/reset', requireAdminAuth, async (req, res) => {
+app.post('/api/competition/code/:id/reset', authenticateToken, requireRole('admin'), async (req, res) => {
     try {
         const { id } = req.params;
         await db.resetAccessCode(parseInt(id));
@@ -373,7 +335,7 @@ app.post('/api/competition/code/:id/reset', requireAdminAuth, async (req, res) =
 // ==================== UPLOAD API ROUTES ====================
 
 // Resim yükle
-app.post('/api/upload', requireAdminAuth, upload.single('image'), (req, res) => {
+app.post('/api/upload', authenticateToken, requireRole('admin'), upload.single('image'), (req, res) => {
     try {
         if (!req.file) {
             return res.status(400).json({ error: 'Dosya yüklenmedi' });
@@ -394,14 +356,27 @@ app.post('/api/upload', requireAdminAuth, upload.single('image'), (req, res) => 
 });
 
 // Resim sil
-app.delete('/api/upload/:filename', requireAdminAuth, (req, res) => {
+app.delete('/api/upload/:filename', authenticateToken, requireRole('admin'), (req, res) => {
     try {
         const { filename } = req.params;
-        const filePath = path.join(__dirname, 'public', 'uploads', filename);
+
+        // Path traversal koruması: sadece dosya adını al, dizin ayırıcıları reddet
+        const sanitized = path.basename(filename);
+        if (sanitized !== filename || filename.includes('..')) {
+            return res.status(400).json({ error: 'Geçersiz dosya adı' });
+        }
+
+        const uploadsDir = path.join(__dirname, 'public', 'uploads');
+        const filePath = path.join(uploadsDir, sanitized);
+
+        // Çözümlenmiş yolun uploads dizini içinde olduğunu doğrula
+        if (!path.resolve(filePath).startsWith(path.resolve(uploadsDir))) {
+            return res.status(400).json({ error: 'Geçersiz dosya yolu' });
+        }
 
         if (fs.existsSync(filePath)) {
             fs.unlinkSync(filePath);
-            console.log('[UPLOAD] Resim silindi:', filename);
+            console.log('[UPLOAD] Resim silindi:', sanitized);
             res.json({ success: true });
         } else {
             res.status(404).json({ error: 'Dosya bulunamadı' });
@@ -426,7 +401,7 @@ app.get('/api/settings', async (req, res) => {
 });
 
 // Ayar güncelle
-app.put('/api/settings/:key', requireAdminAuth, async (req, res) => {
+app.put('/api/settings/:key', authenticateToken, requireRole('admin'), async (req, res) => {
     try {
         const { key } = req.params;
         const { value } = req.body;
@@ -463,7 +438,7 @@ app.get('/api/state', (req, res) => {
 
 // ==================== SOCKET.IO ====================
 
-// JWT Auth Middleware (optional - allows both authenticated and legacy connections)
+// JWT Auth Middleware (optional - auth'suz bağlantılar sadece screen olarak işlenir)
 const { optionalSocketAuth } = require('./src/auth/socketAuth');
 io.use(optionalSocketAuth);
 
@@ -499,28 +474,11 @@ io.on('connection', (socket) => {
         }
     }
 
-    // Legacy: Rol belirleme (JOIN_ROOM - backward compatibility)
-    socket.on('JOIN_ROOM', (data) => {
-        const { role } = data;
-        console.log(`[SOCKET] Legacy JOIN_ROOM: ${role}`);
-
-        switch (role) {
-            case 'admin':
-                registerAdminHandlers(io, socket);
-                break;
-            case 'player':
-                registerPlayerHandlers(io, socket);
-                break;
-            case 'jury':
-                registerJuryHandlers(io, socket);
-                break;
-            case 'screen':
-                registerScreenHandlers(io, socket);
-                break;
-            default:
-                socket.emit('ERROR', { message: 'Geçersiz rol' });
-        }
-    });
+    // Auth'suz bağlantılar sadece screen (seyirci) olarak işlenir
+    if (!socket.role) {
+        console.log(`[SOCKET] Unauthenticated connection -> screen handler: ${socket.id}`);
+        registerScreenHandlers(io, socket);
+    }
 
     // Genel bağlantı kopması
     socket.on('disconnect', (reason) => {

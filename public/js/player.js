@@ -64,6 +64,13 @@ async function validateExistingSession() {
                 tableNo: data.slotNumber,
                 competitionName: data.competitionName
             };
+            // Taze JWT token'ları kaydet (socket auth için)
+            if (data.accessToken) {
+                localStorage.setItem('playerAccessToken', data.accessToken);
+            }
+            if (data.refreshToken) {
+                localStorage.setItem('playerRefreshToken', data.refreshToken);
+            }
             return true;
         }
     } catch (error) {
@@ -260,6 +267,14 @@ async function login() {
 
             sessionToken = data.sessionToken;
             localStorage.setItem('playerSessionToken', sessionToken);
+
+            // JWT token'ları kaydet (socket auth için)
+            if (data.accessToken) {
+                localStorage.setItem('playerAccessToken', data.accessToken);
+            }
+            if (data.refreshToken) {
+                localStorage.setItem('playerRefreshToken', data.refreshToken);
+            }
 
             playerData = {
                 name: data.name,
@@ -527,7 +542,7 @@ function renderPlayerLeaderboard(leaderboard) {
             <div class="p-rank">${index + 1}</div>
             <div class="p-info">
                 <span class="p-name">${escapeHtml(entry.name)}</span>
-                <span class="p-table">Masa ${entry.table_no}</span>
+                <span class="p-table">Masa ${escapeHtml(String(entry.table_no))}</span>
             </div>
             <div class="p-score">${entry.total_score}</div>
         `;

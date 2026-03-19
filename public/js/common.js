@@ -50,10 +50,7 @@ class SocketManager {
             this.isConnected = true;
             this.hideConnectionOverlay();
 
-            // JWT yoksa legacy JOIN_ROOM kullan
-            if (!token) {
-                this.socket.emit('JOIN_ROOM', { role: this.role });
-            }
+            // JWT yoksa server tarafında otomatik olarak screen handler atanır
 
             // Yeniden bağlantı durumunda callback çağır
             if (wasConnected && this.onReconnectCallback) {
@@ -90,11 +87,14 @@ class SocketManager {
 
         this.connectionOverlay = document.createElement('div');
         this.connectionOverlay.className = 'connection-overlay';
-        this.connectionOverlay.innerHTML = `
-            <h1>⚠️ BAĞLANTI HATASI</h1>
-            <p>${message}</p>
-            <div class="spinner" style="margin-top: 2rem;"></div>
-        `;
+        const h1 = document.createElement('h1');
+        h1.textContent = '⚠️ BAĞLANTI HATASI';
+        const p = document.createElement('p');
+        p.textContent = message;
+        const spinner = document.createElement('div');
+        spinner.className = 'spinner';
+        spinner.style.marginTop = '2rem';
+        this.connectionOverlay.append(h1, p, spinner);
         document.body.appendChild(this.connectionOverlay);
     }
 
@@ -142,12 +142,14 @@ function showToast(message, type = 'info', duration = 3000) {
 
     const toast = document.createElement('div');
     toast.className = `toast toast-${type}`;
-    toast.innerHTML = `
-        <div class="flex items-center gap-2">
-            <span>${getToastIcon(type)}</span>
-            <span>${message}</span>
-        </div>
-    `;
+    const wrapper = document.createElement('div');
+    wrapper.className = 'flex items-center gap-2';
+    const iconSpan = document.createElement('span');
+    iconSpan.textContent = getToastIcon(type);
+    const msgSpan = document.createElement('span');
+    msgSpan.textContent = message;
+    wrapper.append(iconSpan, msgSpan);
+    toast.appendChild(wrapper);
 
     container.appendChild(toast);
 

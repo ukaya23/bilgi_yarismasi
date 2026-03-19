@@ -520,7 +520,7 @@ class PostgresDatabase {
                 'INSERT INTO admin_users (username, password_hash) VALUES ($1, $2)',
                 ['admin', hashedPassword]
             );
-            console.log('✓ Default admin user created (username: admin, password: admin123)');
+            console.log('✓ Default admin user created (username: admin) - Change the default password immediately!');
         }
     }
 
@@ -533,6 +533,16 @@ class PostgresDatabase {
             [username]
         );
         return result.rows[0] || null;
+    }
+
+    /**
+     * Admin şifresini güncelle
+     */
+    async updateAdminPassword(adminId, hashedPassword) {
+        await this.pool.query(
+            'UPDATE admin_users SET password_hash = $1 WHERE id = $2',
+            [hashedPassword, adminId]
+        );
     }
 
     /**

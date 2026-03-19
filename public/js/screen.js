@@ -257,8 +257,8 @@ class CinematicManager {
         div.innerHTML = `
             <div class="entry-rank">${rankEmoji}</div>
             <div class="entry-info">
-                <div class="entry-name">${player.name}</div>
-                <div class="entry-table">Masa ${player.table_no}</div>
+                <div class="entry-name">${escapeHtml(player.name)}</div>
+                <div class="entry-table">Masa ${escapeHtml(String(player.table_no))}</div>
             </div>
             <div class="entry-score">${score}</div>
         `;
@@ -466,7 +466,7 @@ function updateContestantsPreview() {
     online.forEach(c => {
         const badge = document.createElement('div');
         badge.className = 'preview-badge online';
-        badge.innerHTML = `<span class="status-dot status-online"></span><span>Masa ${c.table_no}: ${c.name}</span>`;
+        badge.innerHTML = `<span class="status-dot status-online"></span><span>Masa ${escapeHtml(String(c.table_no))}: ${escapeHtml(c.name)}</span>`;
         container.appendChild(badge);
     });
     if (online.length === 0) container.innerHTML = '<p class="text-muted">Henüz yarışmacı bağlanmadı</p>';
@@ -526,7 +526,7 @@ function updateContestantsGrid() {
         const card = document.createElement('div');
         card.className = `contestant-card ${c.status.toLowerCase()}`;
         card.id = `screen-contestant-${c.id}`;
-        card.innerHTML = `<div class="contestant-table">${c.table_no}</div><div class="contestant-name">${c.name}</div>`;
+        card.innerHTML = `<div class="contestant-table">${escapeHtml(String(c.table_no))}</div><div class="contestant-name">${escapeHtml(c.name)}</div>`;
         grid.appendChild(card);
     });
 }
@@ -585,11 +585,11 @@ function updateAnswersGrid(answers, hidden = false) {
 
         card.innerHTML = `
             <div class="answer-card-header">
-                <span>Masa ${a.table_no}</span>
-                <span>${a.name}</span>
+                <span>Masa ${escapeHtml(String(a.table_no))}</span>
+                <span>${escapeHtml(a.name)}</span>
             </div>
             <div class="answer-card-content">
-                ${isEmpty ? '(Boş)' : a.answer_text}
+                ${isEmpty ? '(Boş)' : escapeHtml(a.answer_text)}
             </div>
         `;
         grid.appendChild(card);
