@@ -6,6 +6,7 @@
 const { GameState } = require('./gameState');
 // CompetitionManager is the sole creator of GameState instances
 const db = require('../../database/postgres');
+const log = require('../utils/logger');
 
 class CompetitionManager {
     constructor() {
@@ -37,7 +38,7 @@ class CompetitionManager {
                 gameState.setIO(this.io);
             }
             this.competitions.set(competitionId, gameState);
-            console.log(`[COMP MANAGER] Created new game state for competition ${competitionId}`);
+            log.info({ competitionId }, 'Created new game state');
         }
         return this.competitions.get(competitionId);
     }
@@ -61,12 +62,9 @@ class CompetitionManager {
     removeGameState(competitionId) {
         const gameState = this.competitions.get(competitionId);
         if (gameState) {
-            // Cleanup timers etc.
-            if (gameState.timer) {
-                clearInterval(gameState.timer);
-            }
+            gameState.stopTimer();
             this.competitions.delete(competitionId);
-            console.log(`[COMP MANAGER] Removed game state for competition ${competitionId}`);
+            log.info({ competitionId }, 'Removed game state');
         }
     }
 

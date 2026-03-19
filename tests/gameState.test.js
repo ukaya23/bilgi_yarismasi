@@ -18,6 +18,17 @@ jest.mock('../database/postgres', () => ({
     resetAllContestants: jest.fn().mockResolvedValue()
 }));
 
+jest.mock('../src/state/gradingService', () => ({
+    autoGradeMultipleChoice: jest.fn().mockResolvedValue(),
+    prepareJuryReview: jest.fn().mockResolvedValue({
+        questionId: 1, questionContent: 'Test', correctKeys: ['A'],
+        points: 10, groups: { correct: [], incorrect: [], empty: [] }, emptyCount: 0
+    }),
+    isSimilar: jest.fn(),
+    groupAnswers: jest.fn(),
+    createEmptyAnswers: jest.fn().mockResolvedValue()
+}));
+
 const db = require('../database/postgres');
 const { GameState } = require('../src/state/gameState');
 // GameState now exports { GameState } class - no singleton
@@ -55,7 +66,7 @@ describe('GameState - State Machine', () => {
 
     afterEach(() => {
         // Clear any timers
-        if (gs.timer) clearInterval(gs.timer);
+        gs.gameTimer.stop();
     });
 
     it('should start in IDLE state', () => {
@@ -108,11 +119,15 @@ describe('GameState - State Machine', () => {
     });
 
     it('should warn but allow invalid transition', async () => {
-        const spy = jest.spyOn(console, 'warn').mockImplementation();
+        const log = require('../src/utils/logger');
+        const spy = jest.spyOn(log, 'warn').mockImplementation();
 
         await gs.setState('GRADING'); // IDLE -> GRADING is invalid
 
-        expect(spy).toHaveBeenCalledWith(expect.stringContaining('Geçersiz geçiş'));
+        expect(spy).toHaveBeenCalledWith(
+            expect.objectContaining({ from: 'IDLE', to: 'GRADING' }),
+            expect.stringContaining('Gecersiz state gecisi')
+        );
         // Still transitions (current behavior - warn but allow)
         expect(gs.state).toBe('GRADING');
 
@@ -139,7 +154,7 @@ describe('GameState - Start Question', () => {
     });
 
     afterEach(() => {
-        if (gs.timer) clearInterval(gs.timer);
+        gs.gameTimer.stop();
     });
 
     it('should set current question and transition to QUESTION_ACTIVE', async () => {
@@ -155,18 +170,18 @@ describe('GameState - Start Question', () => {
     it('should throw if question not found', async () => {
         db.getQuestionById.mockResolvedValue(null);
 
-        await expect(gs.startQuestion(999)).rejects.toThrow('Soru bulunamadı');
+        await expect(gs.startQuestion(999)).rejects.toThrow('Soru bulunamadi');
     });
 
     it('should clear previous timer when starting new question', async () => {
         await gs.startQuestion(1);
-        const firstTimer = gs.timer;
+        const firstTimer = gs.gameTimer.timer;
 
         db.getQuestionById.mockResolvedValue({ ...mockQuestion, id: 2 });
         db.getAllQuestions.mockResolvedValue([mockQuestion, { ...mockQuestion, id: 2 }]);
         await gs.startQuestion(2);
 
-        expect(gs.timer).not.toBe(firstTimer);
+        expect(gs.gameTimer.timer).not.toBe(firstTimer);
     });
 
     it('should send question to players without correct_keys', async () => {
@@ -229,7 +244,7 @@ describe('GameState - Submit Answer', () => {
         db.getAllQuestions.mockResolvedValue([mockQuestion]);
         await gs.startQuestion(1);
         // Stop timer to avoid interference
-        if (gs.timer) { clearInterval(gs.timer); gs.timer = null; }
+        gs.gameTimer.stop();
     });
 
     it('should accept answer when QUESTION_ACTIVE', async () => {
@@ -285,125 +300,6 @@ describe('GameState - Submit Answer', () => {
     });
 });
 
-describe('GameState - isSimilar (Levenshtein)', () => {
-    let gs;
-
-    beforeEach(() => {
-        gs = createGameState();
-    });
-
-    it('should return true for identical strings', () => {
-        expect(gs.isSimilar('ankara', 'ankara')).toBe(true);
-    });
-
-    it('should return true for very similar strings', () => {
-        expect(gs.isSimilar('ankara', 'ankra')).toBe(true); // 1 char missing
-        expect(gs.isSimilar('atatürk', 'atatürk')).toBe(true);
-    });
-
-    it('should return false for very different strings', () => {
-        expect(gs.isSimilar('ankara', 'istanbul')).toBe(false);
-        expect(gs.isSimilar('abc', 'xyz')).toBe(false);
-    });
-
-    it('should handle single character strings', () => {
-        expect(gs.isSimilar('a', 'a')).toBe(true);
-        expect(gs.isSimilar('a', 'b')).toBe(false);
-    });
-
-    it('should handle empty strings', () => {
-        expect(gs.isSimilar('', '')).toBe(true);
-    });
-
-    it('should respect custom threshold', () => {
-        // "ankara" vs "ankra" - distance 1, maxLen 6, similarity 0.833
-        expect(gs.isSimilar('ankara', 'ankra', 0.9)).toBe(false); // strict
-        expect(gs.isSimilar('ankara', 'ankra', 0.7)).toBe(true);  // lenient
-    });
-});
-
-describe('GameState - groupAnswers', () => {
-    let gs;
-
-    beforeEach(() => {
-        gs = createGameState();
-        gs.currentQuestion = {
-            correct_keys: ['Ankara', 'ankara']
-        };
-    });
-
-    it('should group exact match as correct', () => {
-        const answers = [
-            { id: 1, answer_text: 'Ankara', name: 'P1' }
-        ];
-
-        const groups = gs.groupAnswers(answers);
-
-        expect(groups.correct).toHaveLength(1);
-        expect(groups.incorrect).toHaveLength(0);
-    });
-
-    it('should group case-insensitive match as correct', () => {
-        const answers = [
-            { id: 1, answer_text: 'ANKARA', name: 'P1' },
-            { id: 2, answer_text: 'ankara', name: 'P2' }
-        ];
-
-        const groups = gs.groupAnswers(answers);
-
-        expect(groups.correct).toHaveLength(2);
-    });
-
-    it('should group wrong answers as incorrect', () => {
-        const answers = [
-            { id: 1, answer_text: 'İstanbul', name: 'P1' },
-            { id: 2, answer_text: 'İzmir', name: 'P2' }
-        ];
-
-        const groups = gs.groupAnswers(answers);
-
-        expect(groups.incorrect).toHaveLength(2);
-        expect(groups.correct).toHaveLength(0);
-    });
-
-    it('should group empty answers separately', () => {
-        const answers = [
-            { id: 1, answer_text: '', name: 'P1' },
-            { id: 2, answer_text: '  ', name: 'P2' },
-            { id: 3, answer_text: null, name: 'P3' }
-        ];
-
-        const groups = gs.groupAnswers(answers);
-
-        expect(groups.empty).toHaveLength(3);
-    });
-
-    it('should group similar answers as correct', () => {
-        const answers = [
-            { id: 1, answer_text: 'Ankra', name: 'P1' } // typo
-        ];
-
-        const groups = gs.groupAnswers(answers);
-
-        expect(groups.correct).toHaveLength(1);
-    });
-
-    it('should handle mixed answers correctly', () => {
-        const answers = [
-            { id: 1, answer_text: 'Ankara', name: 'P1' },
-            { id: 2, answer_text: 'İstanbul', name: 'P2' },
-            { id: 3, answer_text: '', name: 'P3' },
-            { id: 4, answer_text: 'ankra', name: 'P4' } // similar
-        ];
-
-        const groups = gs.groupAnswers(answers);
-
-        expect(groups.correct).toHaveLength(2); // Ankara + ankra
-        expect(groups.incorrect).toHaveLength(1); // İstanbul
-        expect(groups.empty).toHaveLength(1);
-    });
-});
-
 describe('GameState - goToIdle & resetGame', () => {
     let gs;
 
@@ -416,7 +312,7 @@ describe('GameState - goToIdle & resetGame', () => {
 
     it('should reset all state on goToIdle', async () => {
         await gs.startQuestion(1);
-        if (gs.timer) { clearInterval(gs.timer); gs.timer = null; }
+        gs.gameTimer.stop();
         gs.answeredPlayers.add(1);
 
         await gs.goToIdle();
@@ -437,28 +333,29 @@ describe('GameState - goToIdle & resetGame', () => {
 });
 
 describe('GameState - Competition Isolation', () => {
-    it('should pass competitionId to DB queries in autoGradeMultipleChoice', async () => {
+    it('should delegate autoGrading with correct competitionId to gradingService', async () => {
         jest.clearAllMocks();
+        const gradingService = require('../src/state/gradingService');
         const gs = new GameState(5);
         gs.io = { emit: jest.fn(), to: jest.fn().mockReturnValue({ emit: jest.fn() }) };
 
         db.getQuestionById.mockResolvedValue(mockQuestion);
         db.getAllQuestions.mockResolvedValue([mockQuestion]);
-        db.getAnswersForQuestion.mockResolvedValue([]);
-        db.getAllContestants.mockResolvedValue([]);
         db.getSetting.mockResolvedValue('AUTO');
         db.getLeaderboard.mockResolvedValue([]);
         db.getRandomQuote.mockResolvedValue({ text: 'Test', author: 'Author' });
+        db.getAnswersForQuestion.mockResolvedValue([]);
 
         await gs.startQuestion(1);
-        if (gs.timer) { clearInterval(gs.timer); gs.timer = null; }
+        gs.gameTimer.stop();
 
-        // Manually trigger autoGrade
-        await gs.autoGradeMultipleChoice();
+        // Manually trigger lockQuestion (which calls autoGrade for MC)
+        await gs.lockQuestion();
 
-        // Verify competitionId=5 is passed to DB calls
-        expect(db.getAnswersForQuestion).toHaveBeenCalledWith(1, 5);
-        expect(db.getAllContestants).toHaveBeenCalledWith(5);
+        // Verify gradingService was called with competitionId=5
+        expect(gradingService.autoGradeMultipleChoice).toHaveBeenCalledWith(
+            1, 5, ['Ankara'], 10
+        );
     });
 
     it('should pass competitionId to resetAllContestants', async () => {

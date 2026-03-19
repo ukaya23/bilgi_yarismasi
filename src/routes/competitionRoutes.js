@@ -8,6 +8,7 @@ const router = express.Router();
 const db = require('../../database/postgres');
 const { authenticateToken, requireRole } = require('../auth/authMiddleware');
 const competitionManager = require('../state/competitionManager');
+const log = require('../utils/logger');
 
 /**
  * GET /api/competitions
@@ -21,7 +22,7 @@ router.get('/', async (req, res) => {
             competitions
         });
     } catch (error) {
-        console.error('[COMPETITION] Get competitions error:', error);
+        log.error({ err: error }, 'Yarismalari getirme hatasi');
         res.status(500).json({
             success: false,
             error: 'Failed to fetch competitions'
@@ -55,7 +56,7 @@ router.get('/:id', async (req, res) => {
             }
         });
     } catch (error) {
-        console.error('[COMPETITION] Get competition error:', error);
+        log.error({ err: error }, 'Yarisma getirme hatasi');
         res.status(500).json({
             success: false,
             error: 'Failed to fetch competition'
@@ -93,7 +94,7 @@ router.post('/', authenticateToken, requireRole('admin'), async (req, res) => {
             message: 'Competition created successfully'
         });
     } catch (error) {
-        console.error('[COMPETITION] Create competition error:', error);
+        log.error({ err: error }, 'Yarisma olusturma hatasi');
         res.status(500).json({
             success: false,
             error: 'Failed to create competition'
@@ -117,7 +118,7 @@ router.put('/:id', authenticateToken, requireRole('admin'), async (req, res) => 
             message: 'Competition updated successfully'
         });
     } catch (error) {
-        console.error('[COMPETITION] Update competition error:', error);
+        log.error({ err: error }, 'Yarisma guncelleme hatasi');
         res.status(500).json({
             success: false,
             error: 'Failed to update competition'
@@ -139,7 +140,7 @@ router.get('/:id/contestants', async (req, res) => {
             contestants
         });
     } catch (error) {
-        console.error('[COMPETITION] Get contestants error:', error);
+        log.error({ err: error }, 'Yarismacilari getirme hatasi');
         res.status(500).json({
             success: false,
             error: 'Failed to fetch contestants'
@@ -161,7 +162,7 @@ router.get('/:id/leaderboard', async (req, res) => {
             leaderboard
         });
     } catch (error) {
-        console.error('[COMPETITION] Get leaderboard error:', error);
+        log.error({ err: error }, 'Siralama getirme hatasi');
         res.status(500).json({
             success: false,
             error: 'Failed to fetch leaderboard'

@@ -6,6 +6,7 @@
 require('dotenv').config();
 const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
+const log = require('../src/utils/logger');
 
 class PostgresDatabase {
     constructor() {
@@ -18,7 +19,7 @@ class PostgresDatabase {
 
         // Error handler for pool
         this.pool.on('error', (err) => {
-            console.error('[DB] Unexpected error on idle client', err);
+            log.error({ err }, 'Unexpected error on idle DB client');
         });
     }
 
@@ -30,12 +31,12 @@ class PostgresDatabase {
             const client = await this.pool.connect();
             try {
                 const result = await client.query('SELECT NOW()');
-                console.log('✓ PostgreSQL connected at:', result.rows[0].now);
+                log.info({ connectedAt: result.rows[0].now }, 'PostgreSQL connected');
             } finally {
                 client.release();
             }
         } catch (error) {
-            console.error('✗ Database connection error:', error);
+            log.fatal({ err: error }, 'Database connection error');
             throw error;
         }
     }
@@ -283,7 +284,7 @@ class PostgresDatabase {
                     await client.query('ALTER SEQUENCE answers_id_seq RESTART WITH 1');
                     await client.query('ALTER SEQUENCE contestants_id_seq RESTART WITH 1');
                 } catch (seqError) {
-                    console.log('[DB] Sequence reset atlanıyor:', seqError.message);
+                    log.debug({ message: seqError.message }, 'Sequence reset atlaniyor');
                 }
             }
 
@@ -342,6 +343,26 @@ class PostgresDatabase {
         } finally {
             client.release();
         }
+    }
+
+    /**
+     * Toplu bos cevap kaydet (cevap vermeyen yarismacilar icin)
+     */
+    async saveAnswersBulk(questionId, contestantIds) {
+        if (!contestantIds || contestantIds.length === 0) return;
+
+        // ($1, $2, '', 0), ($1, $3, '', 0), ... seklinde VALUES olustur
+        const params = [questionId];
+        const valueClauses = contestantIds.map((cId, i) => {
+            params.push(cId);
+            return `($1, $${i + 2}, '', 0)`;
+        });
+
+        await this.pool.query(
+            `INSERT INTO answers (question_id, contestant_id, answer_text, time_remaining)
+             VALUES ${valueClauses.join(', ')}`,
+            params
+        );
     }
 
     /**
@@ -424,31 +445,29 @@ class PostgresDatabase {
     }
 
     /**
-     * Toplu cevap puanla
+     * Toplu cevap puanla (tek SQL ile)
      */
     async gradeAnswersBulk(answerIds, isCorrect, points) {
+        if (!answerIds || answerIds.length === 0) return;
+
         const client = await this.pool.connect();
         try {
             await client.query('BEGIN');
 
-            for (const id of answerIds) {
-                await client.query(
-                    'UPDATE answers SET is_correct = $1, points_awarded = $2 WHERE id = $3',
-                    [isCorrect, points, id]
-                );
+            // Tek UPDATE ile tum cevaplari puanla
+            await client.query(
+                'UPDATE answers SET is_correct = $1, points_awarded = $2 WHERE id = ANY($3)',
+                [isCorrect, points, answerIds]
+            );
 
-                if (points > 0) {
-                    const answer = await client.query(
-                        'SELECT contestant_id FROM answers WHERE id = $1',
-                        [id]
-                    );
-                    if (answer.rows.length > 0) {
-                        await client.query(
-                            'UPDATE contestants SET total_score = total_score + $1 WHERE id = $2',
-                            [points, answer.rows[0].contestant_id]
-                        );
-                    }
-                }
+            // Puan varsa yarismaci skorlarini tek sorguda guncelle
+            if (points > 0) {
+                await client.query(`
+                    UPDATE contestants c
+                    SET total_score = c.total_score + $1
+                    FROM answers a
+                    WHERE a.contestant_id = c.id AND a.id = ANY($2)
+                `, [points, answerIds]);
             }
 
             await client.query('COMMIT');
@@ -564,7 +583,7 @@ class PostgresDatabase {
                 'INSERT INTO admin_users (username, password_hash) VALUES ($1, $2)',
                 ['admin', hashedPassword]
             );
-            console.log('✓ Default admin user created (username: admin) - Change the default password immediately!');
+            log.warn('Default admin user created (username: admin) - Change the default password immediately!');
         }
     }
 
@@ -709,34 +728,36 @@ class PostgresDatabase {
     // ==================== ERİŞİM KODU İŞLEMLERİ ====================
 
     /**
-     * Erişim kodları oluştur
+     * Erisim kodlari olustur (tek multi-row INSERT)
      */
     async generateAccessCodes(competitionId, contestantCount, juryCount) {
-        const codes = [];
+        const params = [];
+        const valueClauses = [];
+        let paramIdx = 1;
 
-        // Yarışmacı kodları
+        // Yarismaci kodlari
         for (let i = 1; i <= contestantCount; i++) {
             const code = Math.floor(100000 + Math.random() * 900000).toString();
-            const result = await this.pool.query(`
-                INSERT INTO access_codes (competition_id, code, role, name, slot_number)
-                VALUES ($1, $2, 'CONTESTANT', $3, $4)
-                RETURNING *
-            `, [competitionId, code, `Yarışmacı ${i}`, i]);
-            codes.push(result.rows[0]);
+            valueClauses.push(`($${paramIdx}, $${paramIdx + 1}, 'CONTESTANT', $${paramIdx + 2}, $${paramIdx + 3})`);
+            params.push(competitionId, code, `Yarışmacı ${i}`, i);
+            paramIdx += 4;
         }
 
-        // Jüri kodları
+        // Juri kodlari
         for (let i = 1; i <= juryCount; i++) {
             const code = Math.floor(100000 + Math.random() * 900000).toString();
-            const result = await this.pool.query(`
-                INSERT INTO access_codes (competition_id, code, role, name, slot_number)
-                VALUES ($1, $2, 'JURY', $3, $4)
-                RETURNING *
-            `, [competitionId, code, `Jüri ${i}`, i]);
-            codes.push(result.rows[0]);
+            valueClauses.push(`($${paramIdx}, $${paramIdx + 1}, 'JURY', $${paramIdx + 2}, $${paramIdx + 3})`);
+            params.push(competitionId, code, `Jüri ${i}`, i);
+            paramIdx += 4;
         }
 
-        return codes;
+        const result = await this.pool.query(`
+            INSERT INTO access_codes (competition_id, code, role, name, slot_number)
+            VALUES ${valueClauses.join(', ')}
+            RETURNING *
+        `, params);
+
+        return result.rows;
     }
 
     /**

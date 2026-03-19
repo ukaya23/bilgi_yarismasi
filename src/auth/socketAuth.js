@@ -4,6 +4,7 @@
 
 const { verifyToken } = require('./jwtUtils');
 const db = require('../../database/postgres');
+const log = require('../utils/logger');
 
 /**
  * Socket.io middleware for JWT authentication
@@ -57,7 +58,7 @@ async function socketAuthMiddleware(socket, next) {
 
         next();
     } catch (error) {
-        console.error('[SOCKET AUTH] Authentication failed:', error.message);
+        log.error({ err: error }, 'Socket auth failed');
         next(new Error('Invalid or expired token'));
     }
 }

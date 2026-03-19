@@ -3,9 +3,10 @@
  */
 
 const db = require('../../database/postgres');
+const log = require('../utils/logger');
 
 async function registerAdminHandlers(io, socket, gameState) {
-    console.log(`[ADMIN] Bağlandı: ${socket.id}`);
+    log.info({ socketId: socket.id }, 'Admin baglandi');
 
     // Admin odasına katıl
     socket.join('admin');
@@ -136,7 +137,7 @@ async function registerAdminHandlers(io, socket, gameState) {
 
     // Bağlantı kopması
     socket.on('disconnect', () => {
-        console.log(`[ADMIN] Ayrıldı: ${socket.id}`);
+        log.info({ socketId: socket.id }, 'Admin ayrildi');
     });
 }
 

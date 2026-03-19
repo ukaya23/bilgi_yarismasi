@@ -1,6 +1,6 @@
 /**
  * Bilgi Yarışması - Ana Sunucu Dosyası
- * 
+ *
  * LAN tabanlı gerçek zamanlı bilgi yarışması platformu
  */
 
@@ -8,38 +8,7 @@ const express = require('express');
 const { createServer } = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
-const { v4: uuidv4 } = require('uuid');
-const multer = require('multer');
-const fs = require('fs');
-
-// Multer konfigürasyonu - Resim yükleme
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        const uploadsDir = path.join(__dirname, 'public', 'uploads');
-        if (!fs.existsSync(uploadsDir)) {
-            fs.mkdirSync(uploadsDir, { recursive: true });
-        }
-        cb(null, uploadsDir);
-    },
-    filename: (req, file, cb) => {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        const ext = path.extname(file.originalname);
-        cb(null, 'question-' + uniqueSuffix + ext);
-    }
-});
-
-const upload = multer({
-    storage: storage,
-    limits: { fileSize: 10 * 1024 * 1024 }, // Max 10MB
-    fileFilter: (req, file, cb) => {
-        const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-        if (allowedTypes.includes(file.mimetype)) {
-            cb(null, true);
-        } else {
-            cb(new Error('Sadece resim dosyaları (JPEG, PNG, GIF, WEBP) yüklenebilir'), false);
-        }
-    }
-});
+const log = require('./src/utils/logger');
 
 // Veritabanı ve State
 const db = require('./database/postgres');
@@ -74,19 +43,17 @@ app.use(express.json());
 // Rate Limiting
 const rateLimit = require('express-rate-limit');
 
-// Auth endpoint'leri için sıkı limit (brute force koruması)
 const authLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 dakika
-    max: 20, // 15 dakikada max 20 istek
+    windowMs: 15 * 60 * 1000,
+    max: 20,
     message: { error: 'Çok fazla giriş denemesi. 15 dakika sonra tekrar deneyin.' },
     standardHeaders: true,
     legacyHeaders: false
 });
 
-// Genel API limiti
 const apiLimiter = rateLimit({
-    windowMs: 1 * 60 * 1000, // 1 dakika
-    max: 100, // dakikada max 100 istek
+    windowMs: 1 * 60 * 1000,
+    max: 100,
     message: { error: 'Çok fazla istek. Lütfen biraz bekleyin.' },
     standardHeaders: true,
     legacyHeaders: false
@@ -94,377 +61,49 @@ const apiLimiter = rateLimit({
 
 app.use('/api/', apiLimiter);
 
-const { verifyToken, generateTokenPair } = require('./src/auth/jwtUtils');
-const { authenticateToken, requireRole } = require('./src/auth/authMiddleware');
-
 // ==================== ROUTES ====================
 
-// Ana sayfa - Yönlendirme
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
+// Sayfa yönlendirmeleri
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+app.get('/admin-login', (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin-login.html')));
+app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
+app.get('/player', (req, res) => res.sendFile(path.join(__dirname, 'public', 'player.html')));
+app.get('/jury', (req, res) => res.sendFile(path.join(__dirname, 'public', 'jury.html')));
+app.get('/screen', (req, res) => res.sendFile(path.join(__dirname, 'public', 'screen.html')));
 
-// Admin Login Sayfası
-app.get('/admin-login', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'admin-login.html'));
-});
-
-// Admin Paneli
-app.get('/admin', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'admin.html'));
-});
-
-// Yarışmacı Arayüzü
-app.get('/player', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'player.html'));
-});
-
-// Jüri Arayüzü
-app.get('/jury', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'jury.html'));
-});
-
-// Seyirci Ekranı
-app.get('/screen', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'screen.html'));
-});
-
-// ==================== JWT AUTH ROUTES ====================
+// API Routes
 const authRoutes = require('./src/routes/authRoutes');
+const competitionRoutes = require('./src/routes/competitionRoutes');
+const uploadRoutes = require('./src/routes/uploadRoutes');
+const settingsRoutes = require('./src/routes/settingsRoutes');
+const gameRoutes = require('./src/routes/gameRoutes');
+
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/validate-code', authLimiter);
 app.use('/api/auth/change-password', authLimiter);
 app.use('/api/auth', authRoutes);
-
-// ==================== COMPETITION ROUTES ====================
-const competitionRoutes = require('./src/routes/competitionRoutes');
 app.use('/api/competitions', competitionRoutes);
-
-// ==================== ACCESS CODE AUTH ROUTES ====================
-
-// Erişim kodu doğrulama (Yarışmacı/Jüri)
-app.post('/api/auth/validate-code', async (req, res) => {
-    try {
-        const { code } = req.body;
-
-        if (!code || code.length < 6) {
-            return res.status(400).json({ error: 'Geçersiz kod formatı' });
-        }
-
-        const result = await db.validateAccessCode(code);
-
-        if (!result.valid) {
-            return res.status(401).json({ error: result.message });
-        }
-
-        // Session token oluştur
-        const sessionToken = uuidv4();
-        await db.markCodeAsUsed(result.accessCode.id, sessionToken);
-
-        // JWT token pair oluştur
-        const jwtRole = result.accessCode.role === 'CONTESTANT' ? 'player' : 'jury';
-        const tokens = generateTokenPair({
-            id: result.accessCode.slot_number,
-            username: result.accessCode.name,
-            role: jwtRole,
-            competitionId: result.accessCode.competition_id
-        });
-
-        res.json({
-            success: true,
-            sessionToken,
-            role: result.accessCode.role,
-            name: result.accessCode.name,
-            slotNumber: result.accessCode.slot_number,
-            competitionName: result.accessCode.competition_name,
-            accessToken: tokens.accessToken,
-            refreshToken: tokens.refreshToken
-        });
-    } catch (error) {
-        console.error('Kod doğrulama hatası:', error);
-        res.status(500).json({ error: 'Sunucu hatası' });
-    }
-});
-
-// Session token kontrolü
-app.post('/api/auth/validate-session', async (req, res) => {
-    try {
-        const { sessionToken } = req.body;
-
-        if (!sessionToken) {
-            return res.json({ valid: false });
-        }
-
-        const accessCode = await db.validateSessionToken(sessionToken);
-
-        if (!accessCode) {
-            return res.json({ valid: false });
-        }
-
-        // Taze JWT token pair oluştur
-        const jwtRole = accessCode.role === 'CONTESTANT' ? 'player' : 'jury';
-        const tokens = generateTokenPair({
-            id: accessCode.slot_number,
-            username: accessCode.name,
-            role: jwtRole,
-            competitionId: accessCode.competition_id
-        });
-
-        res.json({
-            valid: true,
-            role: accessCode.role,
-            name: accessCode.name,
-            slotNumber: accessCode.slot_number,
-            competitionName: accessCode.competition_name,
-            accessToken: tokens.accessToken,
-            refreshToken: tokens.refreshToken
-        });
-    } catch (error) {
-        console.error('Session doğrulama hatası:', error);
-        res.json({ valid: false });
-    }
-});
-
-// ==================== COMPETITION API ROUTES ====================
-
-// Yarışma oluştur
-app.post('/api/competition', authenticateToken, requireRole('admin'), async (req, res) => {
-    try {
-        const { name, contestantCount, juryCount } = req.body;
-
-        if (!name || !contestantCount || !juryCount) {
-            return res.status(400).json({ error: 'Tüm alanlar gerekli' });
-        }
-
-        // Mevcut aktif yarışmayı kapat
-        const activeCompetition = await db.getActiveCompetition();
-        if (activeCompetition) {
-            console.log('[DEBUG] Mevcut aktif yarışma kapatılıyor:', activeCompetition.id);
-            await db.updateCompetitionStatus(activeCompetition.id, 'COMPLETED');
-        }
-
-        // Yeni yarışma oluştur
-        const competitionId = await db.createCompetition(name, contestantCount, juryCount);
-        console.log('[DEBUG] Yeni yarışma ID:', competitionId);
-
-        // Erişim kodlarını oluştur
-        const codes = await db.generateAccessCodes(competitionId, contestantCount, juryCount);
-        console.log('[DEBUG] Oluşturulan kodlar:', codes.length, 'adet');
-
-        res.json({
-            success: true,
-            competitionId,
-            codes
-        });
-    } catch (error) {
-        console.error('Yarışma oluşturma hatası:', error);
-        res.status(500).json({ error: 'Sunucu hatası' });
-    }
-});
-
-// Yarışmayı sonlandır
-app.post('/api/competition/end', authenticateToken, requireRole('admin'), async (req, res) => {
-    try {
-        const activeCompetition = await db.getActiveCompetition();
-        if (activeCompetition) {
-            await db.updateCompetitionStatus(activeCompetition.id, 'COMPLETED');
-            await db.resetAllAccessCodes(activeCompetition.id); // Kodları da sıfırla ki tekrar kullanılabilsin (opsiyonel)
-            const gs = competitionManager.getGameState(activeCompetition.id);
-            await gs.resetGame(); // Oyunu da resetle
-            competitionManager.removeGameState(activeCompetition.id);
-            console.log('[COMPETITION] Yarışma sonlandırıldı:', activeCompetition.id);
-        }
-        res.json({ success: true });
-    } catch (error) {
-        console.error('Yarışma sonlandırma hatası:', error);
-        res.status(500).json({ error: 'Sunucu hatası' });
-    }
-});
-
-// Aktif yarışmayı getir
-app.get('/api/competition/active', async (req, res) => {
-    try {
-        const competition = await db.getActiveCompetition();
-        console.log('[DEBUG] Aktif yarışma:', competition);
-        if (!competition) {
-            return res.json({ active: false });
-        }
-
-        const codes = await db.getAccessCodesByCompetition(competition.id);
-        console.log('[DEBUG] Yarışma kodları:', codes.length, 'adet, yarışma ID:', competition.id);
-        res.json({
-            active: true,
-            competition,
-            codes
-        });
-    } catch (error) {
-        console.error('Yarışma getirme hatası:', error);
-        res.status(500).json({ error: 'Sunucu hatası' });
-    }
-});
-
-// Erişim kodu ismini güncelle
-app.put('/api/competition/code/:id', authenticateToken, requireRole('admin'), async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { name } = req.body;
-
-        if (!name) {
-            return res.status(400).json({ error: 'İsim gerekli' });
-        }
-
-        await db.updateAccessCodeName(parseInt(id), name);
-        res.json({ success: true });
-    } catch (error) {
-        console.error('Kod güncelleme hatası:', error);
-        res.status(500).json({ error: 'Sunucu hatası' });
-    }
-});
-
-// Erişim kodunu sıfırla
-app.post('/api/competition/code/:id/reset', authenticateToken, requireRole('admin'), async (req, res) => {
-    try {
-        const { id } = req.params;
-        await db.resetAccessCode(parseInt(id));
-        res.json({ success: true });
-    } catch (error) {
-        console.error('Kod sıfırlama hatası:', error);
-        res.status(500).json({ error: 'Sunucu hatası' });
-    }
-});
-
-// ==================== UPLOAD API ROUTES ====================
-
-// Resim yükle
-app.post('/api/upload', authenticateToken, requireRole('admin'), upload.single('image'), (req, res) => {
-    try {
-        if (!req.file) {
-            return res.status(400).json({ error: 'Dosya yüklenmedi' });
-        }
-
-        const imageUrl = '/uploads/' + req.file.filename;
-        console.log('[UPLOAD] Resim yüklendi:', imageUrl);
-
-        res.json({
-            success: true,
-            url: imageUrl,
-            filename: req.file.filename
-        });
-    } catch (error) {
-        console.error('Resim yükleme hatası:', error);
-        res.status(500).json({ error: 'Resim yüklenemedi' });
-    }
-});
-
-// Resim sil
-app.delete('/api/upload/:filename', authenticateToken, requireRole('admin'), (req, res) => {
-    try {
-        const { filename } = req.params;
-
-        // Path traversal koruması: sadece dosya adını al, dizin ayırıcıları reddet
-        const sanitized = path.basename(filename);
-        if (sanitized !== filename || filename.includes('..')) {
-            return res.status(400).json({ error: 'Geçersiz dosya adı' });
-        }
-
-        const uploadsDir = path.join(__dirname, 'public', 'uploads');
-        const filePath = path.join(uploadsDir, sanitized);
-
-        // Çözümlenmiş yolun uploads dizini içinde olduğunu doğrula
-        if (!path.resolve(filePath).startsWith(path.resolve(uploadsDir))) {
-            return res.status(400).json({ error: 'Geçersiz dosya yolu' });
-        }
-
-        if (fs.existsSync(filePath)) {
-            fs.unlinkSync(filePath);
-            console.log('[UPLOAD] Resim silindi:', sanitized);
-            res.json({ success: true });
-        } else {
-            res.status(404).json({ error: 'Dosya bulunamadı' });
-        }
-    } catch (error) {
-        console.error('Resim silme hatası:', error);
-        res.status(500).json({ error: 'Resim silinemedi' });
-    }
-});
-
-// ==================== SETTINGS API ROUTES ====================
-
-// Tüm ayarları getir
-app.get('/api/settings', async (req, res) => {
-    try {
-        const settings = await db.getAllSettings();
-        res.json(settings);
-    } catch (error) {
-        console.error('Ayarlar getirme hatası:', error);
-        res.status(500).json({ error: 'Sunucu hatası' });
-    }
-});
-
-// Ayar güncelle
-app.put('/api/settings/:key', authenticateToken, requireRole('admin'), async (req, res) => {
-    try {
-        const { key } = req.params;
-        const { value } = req.body;
-
-        await db.setSetting(key, value.toString());
-        res.json({ success: true });
-    } catch (error) {
-        console.error('Ayar güncelleme hatası:', error);
-        res.status(500).json({ error: 'Sunucu hatası' });
-    }
-});
-
-// ==================== EXISTING API ROUTES ====================
-
-// Sorular API
-app.get('/api/questions', async (req, res) => {
-    res.json(await db.getAllQuestions());
-});
-
-// Yarışmacılar API
-app.get('/api/contestants', async (req, res) => {
-    const competitionId = req.query.competitionId ? parseInt(req.query.competitionId) : null;
-    res.json(await db.getAllContestants(competitionId));
-});
-
-// Liderlik Tablosu API
-app.get('/api/leaderboard', async (req, res) => {
-    const competitionId = req.query.competitionId ? parseInt(req.query.competitionId) : null;
-    res.json(await db.getLeaderboard(competitionId));
-});
-
-// Oyun Durumu API
-app.get('/api/state', async (req, res) => {
-    // Aktif yarışmanın durumunu döndür
-    const activeComp = await db.getActiveCompetition();
-    const compId = activeComp ? activeComp.id : 1;
-    res.json(competitionManager.getGameState(compId).getState());
-});
+app.use('/api/upload', uploadRoutes);
+app.use('/api/settings', settingsRoutes);
+app.use('/api', gameRoutes);
 
 // ==================== SOCKET.IO ====================
 
-// JWT Auth Middleware (optional - auth'suz bağlantılar sadece screen olarak işlenir)
 const { optionalSocketAuth } = require('./src/auth/socketAuth');
 io.use(optionalSocketAuth);
 
 io.on('connection', (socket) => {
-    console.log(`[SOCKET] Yeni bağlantı: ${socket.id}`, socket.role ? `(${socket.role})` : '(unauthenticated)');
+    log.info({ socketId: socket.id, role: socket.role || 'unauthenticated' }, 'Yeni socket baglantisi');
 
-    // JWT-based automatic role assignment
     if (socket.role) {
-        const competitionId = socket.competitionId || 1; // Default to competition 1
-        console.log(`[SOCKET] JWT authenticated: ${socket.username} as ${socket.role} for competition ${competitionId}`);
+        const competitionId = socket.competitionId || 1;
+        log.info({ username: socket.username, role: socket.role, competitionId }, 'JWT authenticated');
 
-        // Join competition-specific room
         const roomName = `${socket.role}-${competitionId}`;
         socket.join(roomName);
-        console.log(`[SOCKET] Joined room: ${roomName}`);
+        log.debug({ socketId: socket.id, room: roomName }, 'Joined room');
 
-        // Store competition ID on socket
         socket.competitionId = competitionId;
-
-        // Get competition-specific game state
         const gameState = competitionManager.getGameState(competitionId);
 
         switch (socket.role) {
@@ -483,67 +122,60 @@ io.on('connection', (socket) => {
         }
     }
 
-    // Auth'suz bağlantılar sadece screen (seyirci) olarak işlenir
     if (!socket.role) {
-        console.log(`[SOCKET] Unauthenticated connection -> screen handler: ${socket.id}`);
+        log.debug({ socketId: socket.id }, 'Unauthenticated connection -> screen handler');
         const defaultGameState = competitionManager.getGameState(1);
         registerScreenHandlers(io, socket, defaultGameState);
     }
 
-    // Genel bağlantı kopması
     socket.on('disconnect', (reason) => {
-        console.log(`[SOCKET] Bağlantı koptu: ${socket.id} - ${reason}`);
+        log.info({ socketId: socket.id, reason }, 'Socket baglantisi koptu');
     });
 });
 
 // ==================== SUNUCU BAŞLAT ====================
 
 const PORT = process.env.PORT || 3000;
-const HOST = '0.0.0.0'; // Tüm ağ arayüzlerinden erişim
+const HOST = '0.0.0.0';
 
 async function startServer() {
     try {
-        // Veritabanını başlat (PostgreSQL)
         await db.initialize();
-
-        // Varsayılan admin kullanıcısını oluştur
         await db.ensureDefaultAdmin();
-
-        // CompetitionManager'ı initialize et
         competitionManager.setIO(io);
 
-        // HTTP sunucusunu başlat
+        // Periyodik token temizligi (her 6 saatte bir, 7 günden eski revoked token'lari sil)
+        setInterval(async () => {
+            try {
+                const deleted = await db.cleanupRevokedTokens();
+                if (deleted > 0) {
+                    log.info({ deleted }, 'Eski revoked tokenlar temizlendi');
+                }
+            } catch (err) {
+                log.error({ err }, 'Token temizligi hatasi');
+            }
+        }, 6 * 60 * 60 * 1000);
+
         httpServer.listen(PORT, HOST, () => {
-            console.log('='.repeat(50));
-            console.log('  BİLGİ YARIŞMASI SUNUCUSU');
-            console.log('='.repeat(50));
-            console.log(`  Sunucu çalışıyor: http://localhost:${PORT}`);
-            console.log('');
-            console.log('  Erişim Adresleri:');
-            console.log(`    Admin:     http://192.168.1.100:${PORT}/admin`);
-            console.log(`    Yarışmacı: http://192.168.1.100:${PORT}/player`);
-            console.log(`    Jüri:      http://192.168.1.100:${PORT}/jury`);
-            console.log(`    Seyirci:   http://192.168.1.100:${PORT}/screen`);
-            console.log('='.repeat(50));
+            log.info({ port: PORT, host: HOST }, 'Bilgi Yarismasi sunucusu baslatildi');
         });
     } catch (error) {
-        console.error('Sunucu başlatma hatası:', error);
+        log.fatal({ err: error }, 'Sunucu baslatma hatasi');
         process.exit(1);
     }
 }
 
-// Sunucuyu başlat
 startServer();
 
 // Graceful Shutdown
 process.on('SIGINT', async () => {
-    console.log('\nSunucu kapatılıyor...');
+    log.info('Sunucu kapatiliyor (SIGINT)...');
     await db.close();
     process.exit(0);
 });
 
 process.on('SIGTERM', async () => {
-    console.log('\nSunucu kapatılıyor...');
+    log.info('Sunucu kapatiliyor (SIGTERM)...');
     await db.close();
     process.exit(0);
 });

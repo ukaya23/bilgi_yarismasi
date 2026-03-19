@@ -3,9 +3,10 @@
  */
 
 const db = require('../../database/postgres');
+const log = require('../utils/logger');
 
 async function registerScreenHandlers(io, socket, gameState) {
-    console.log(`[SCREEN] Bağlandı: ${socket.id}`);
+    log.info({ socketId: socket.id }, 'Screen baglandi');
 
     // Screen odasına katıl
     socket.join('screen');
@@ -40,13 +41,13 @@ async function registerScreenHandlers(io, socket, gameState) {
         try {
             socket.emit('NEW_QUOTE', await db.getRandomQuote());
         } catch (error) {
-            console.error('[SCREEN] Quote fetch error:', error);
+            log.error({ err: error }, 'Quote fetch hatasi');
         }
     });
 
     // Bağlantı kopması
     socket.on('disconnect', () => {
-        console.log(`[SCREEN] Ayrıldı: ${socket.id}`);
+        log.info({ socketId: socket.id }, 'Screen ayrildi');
     });
 }
 

@@ -5,10 +5,12 @@
 
 const express = require('express');
 const router = express.Router();
+const { v4: uuidv4 } = require('uuid');
 const db = require('../../database/postgres');
 const { generateTokenPair } = require('../auth/jwtUtils');
 const { authenticateToken, authenticateRefreshToken } = require('../auth/authMiddleware');
 const bcrypt = require('bcryptjs');
+const log = require('../utils/logger');
 
 /**
  * POST /api/auth/login/admin
@@ -61,7 +63,7 @@ router.post('/login/admin', async (req, res) => {
             refreshToken: tokens.refreshToken
         });
     } catch (error) {
-        console.error('[AUTH] Admin login error:', error);
+        log.error({ err: error }, 'Admin login hatasi');
         res.status(500).json({
             success: false,
             error: 'Login failed'
@@ -69,7 +71,94 @@ router.post('/login/admin', async (req, res) => {
     }
 });
 
-// Player and Jury login are handled via access codes (/api/auth/validate-code)
+/**
+ * POST /api/auth/validate-code
+ * Access code validation (Player/Jury)
+ */
+router.post('/validate-code', async (req, res) => {
+    try {
+        const { code } = req.body;
+
+        if (!code || code.length < 6) {
+            return res.status(400).json({ error: 'Geçersiz kod formatı' });
+        }
+
+        const result = await db.validateAccessCode(code);
+
+        if (!result.valid) {
+            return res.status(401).json({ error: result.message });
+        }
+
+        // Session token oluştur
+        const sessionToken = uuidv4();
+        await db.markCodeAsUsed(result.accessCode.id, sessionToken);
+
+        // JWT token pair oluştur
+        const jwtRole = result.accessCode.role === 'CONTESTANT' ? 'player' : 'jury';
+        const tokens = generateTokenPair({
+            id: result.accessCode.slot_number,
+            username: result.accessCode.name,
+            role: jwtRole,
+            competitionId: result.accessCode.competition_id
+        });
+
+        res.json({
+            success: true,
+            sessionToken,
+            role: result.accessCode.role,
+            name: result.accessCode.name,
+            slotNumber: result.accessCode.slot_number,
+            competitionName: result.accessCode.competition_name,
+            accessToken: tokens.accessToken,
+            refreshToken: tokens.refreshToken
+        });
+    } catch (error) {
+        log.error({ err: error }, 'Kod dogrulama hatasi');
+        res.status(500).json({ error: 'Sunucu hatası' });
+    }
+});
+
+/**
+ * POST /api/auth/validate-session
+ * Session token validation
+ */
+router.post('/validate-session', async (req, res) => {
+    try {
+        const { sessionToken } = req.body;
+
+        if (!sessionToken) {
+            return res.json({ valid: false });
+        }
+
+        const accessCode = await db.validateSessionToken(sessionToken);
+
+        if (!accessCode) {
+            return res.json({ valid: false });
+        }
+
+        // Taze JWT token pair oluştur
+        const jwtRole = accessCode.role === 'CONTESTANT' ? 'player' : 'jury';
+        const tokens = generateTokenPair({
+            id: accessCode.slot_number,
+            username: accessCode.name,
+            role: jwtRole,
+            competitionId: accessCode.competition_id
+        });
+
+        res.json({
+            valid: true,
+            role: accessCode.role,
+            name: accessCode.name,
+            slotNumber: accessCode.slot_number,
+            competitionName: accessCode.competition_name,
+            accessToken: tokens.accessToken,
+            refreshToken: tokens.refreshToken
+        });
+    } catch (error) {
+        log.error({ err: error }, 'Session dogrulama hatasi');
+        res.json({ valid: false });
+    }
+});
 
 /**
  * POST /api/auth/refresh
@@ -90,7 +179,7 @@ router.post('/refresh', authenticateRefreshToken, async (req, res) => {
             refreshToken: tokens.refreshToken
         });
     } catch (error) {
-        console.error('[AUTH] Token refresh error:', error);
+        log.error({ err: error }, 'Token refresh hatasi');
         res.status(500).json({
             success: false,
             error: 'Token refresh failed'
@@ -112,7 +201,7 @@ router.post('/logout', authenticateToken, async (req, res) => {
             message: 'Logged out successfully'
         });
     } catch (error) {
-        console.error('[AUTH] Logout error:', error);
+        log.error({ err: error }, 'Logout hatasi');
         res.status(500).json({
             success: false,
             error: 'Logout failed'
@@ -134,7 +223,7 @@ router.post('/logout/all', authenticateToken, async (req, res) => {
             message: 'Logged out from all devices'
         });
     } catch (error) {
-        console.error('[AUTH] Logout all error:', error);
+        log.error({ err: error }, 'Logout all hatasi');
         res.status(500).json({
             success: false,
             error: 'Logout failed'
@@ -198,7 +287,7 @@ router.post('/change-password', authenticateToken, async (req, res) => {
             refreshToken: tokens.refreshToken
         });
     } catch (error) {
-        console.error('[AUTH] Change password error:', error);
+        log.error({ err: error }, 'Sifre degistirme hatasi');
         res.status(500).json({ success: false, error: 'Password change failed' });
     }
 });

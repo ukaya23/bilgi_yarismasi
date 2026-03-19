@@ -3,12 +3,13 @@
  */
 
 const db = require('../../database/postgres');
+const log = require('../utils/logger');
 
 // Socket ID -> Contestant ID mapping (reconnect için)
 const socketContestantMap = new Map();
 
 function registerPlayerHandlers(io, socket, gameState) {
-    console.log(`[PLAYER] Bağlandı: ${socket.id}`);
+    log.info({ socketId: socket.id }, 'Player baglandi');
 
     // Socket'e contestant bilgisini ekle
     socket.contestantId = null;
@@ -77,9 +78,9 @@ function registerPlayerHandlers(io, socket, gameState) {
             io.to('admin').emit('CONTESTANTS_UPDATED', contestants);
             io.to('screen').emit('CONTESTANTS_UPDATED', contestants);
 
-            console.log(`[PLAYER] Giriş başarılı: ${name} (Masa ${tableNo}) - Contestant ID: ${contestantId}`);
+            log.info({ name, tableNo, contestantId }, 'Player giris basarili');
         } catch (error) {
-            console.error('[PLAYER] Login hatası:', error);
+            log.error({ err: error }, 'Player login hatasi');
             socket.emit('LOGIN_RESULT', { success: false, error: error.message });
         }
     });
@@ -89,28 +90,28 @@ function registerPlayerHandlers(io, socket, gameState) {
         try {
             const contestantId = socket.contestantId;
 
-            console.log(`[PLAYER] Cevap gönderme isteği - Socket: ${socket.id}, Contestant ID: ${contestantId}`);
+            log.debug({ socketId: socket.id, contestantId }, 'Cevap gonderme istegi');
 
             if (contestantId === null || contestantId === undefined) {
-                console.log('[PLAYER] Giriş yapılmamış - contestantId yok');
+                log.debug('Giris yapilmamis - contestantId yok');
                 socket.emit('ANSWER_RESULT', { success: false, error: 'Giriş yapılmamış. Lütfen tekrar giriş yapın.' });
                 return;
             }
 
             const { answer, timeRemaining } = data;
-            console.log(`[PLAYER] Cevap: "${answer}", Kalan süre: ${timeRemaining}`);
+            log.debug({ answer, timeRemaining }, 'Cevap alindi');
 
             const result = await gameState.submitAnswer(contestantId, answer, timeRemaining);
 
             socket.emit('ANSWER_RESULT', result);
 
             if (result.success) {
-                console.log(`[PLAYER] Cevap başarılı: Yarışmacı ${contestantId} -> "${answer}"`);
+                log.info({ contestantId, answer }, 'Cevap basarili');
             } else {
-                console.log(`[PLAYER] Cevap başarısız: ${result.message}`);
+                log.debug({ contestantId, message: result.message }, 'Cevap basarisiz');
             }
         } catch (error) {
-            console.error('[PLAYER] Cevap gönderme hatası:', error);
+            log.error({ err: error }, 'Cevap gonderme hatasi');
             socket.emit('ANSWER_RESULT', { success: false, error: error.message });
         }
     });
@@ -129,7 +130,7 @@ function registerPlayerHandlers(io, socket, gameState) {
             const contestants = await db.getAllContestants(gameState.competitionId);
             io.to('admin').emit('CONTESTANTS_UPDATED', contestants);
             io.to('screen').emit('CONTESTANTS_UPDATED', contestants);
-            console.log(`[PLAYER] Ayrıldı: Yarışmacı ${contestantId}`);
+            log.info({ contestantId }, 'Player ayrildi');
         }
     });
 }

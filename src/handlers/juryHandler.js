@@ -3,9 +3,11 @@
  */
 
 const db = require('../../database/postgres');
+const { groupAnswers } = require('../state/gradingService');
+const log = require('../utils/logger');
 
 async function registerJuryHandlers(io, socket, gameState) {
-    console.log(`[JURY] Bağlandı: ${socket.id}`);
+    log.info({ socketId: socket.id }, 'Jury baglandi');
 
     // Jüri odasına katıl
     socket.join('jury');
@@ -39,7 +41,7 @@ async function registerJuryHandlers(io, socket, gameState) {
             const answers = await db.getAnswersForQuestion(gameState.currentQuestion.id, gameState.competitionId);
             const emptyAnswers = answers.filter(a => !a.answer_text || a.answer_text.trim() === '');
             const nonEmptyAnswers = answers.filter(a => a.answer_text && a.answer_text.trim() !== '');
-            const groupedAnswers = gameState.groupAnswers(nonEmptyAnswers);
+            const groupedAnswers = groupAnswers(nonEmptyAnswers, gameState.currentQuestion.correct_keys);
             initPayload.reviewData = {
                 questionId: gameState.currentQuestion.id,
                 questionContent: gameState.currentQuestion.content,
@@ -49,7 +51,7 @@ async function registerJuryHandlers(io, socket, gameState) {
                 emptyCount: emptyAnswers.length
             };
         } catch (err) {
-            console.error('[JURY] Grading data fetch error:', err);
+            log.error({ err }, 'Jury grading data fetch hatasi');
         }
     }
 
@@ -73,7 +75,7 @@ async function registerJuryHandlers(io, socket, gameState) {
                 count: answerIds.length
             });
 
-            console.log(`[JURY] Grup puanlama: ${answerIds.length} cevap, ${isCorrect ? 'Doğru' : 'Yanlış'}, ${points} puan`);
+            log.info({ count: answerIds.length, isCorrect, points }, 'Jury grup puanlama');
         } catch (error) {
             socket.emit('JURY_ACTION_RESULT', { success: false, error: error.message });
         }
@@ -92,7 +94,7 @@ async function registerJuryHandlers(io, socket, gameState) {
                 answerId
             });
 
-            console.log(`[JURY] Manuel puanlama: Cevap ${answerId}, ${isCorrect ? 'Doğru' : 'Yanlış'}, ${points} puan`);
+            log.info({ answerId, isCorrect, points }, 'Jury manuel puanlama');
         } catch (error) {
             socket.emit('JURY_ACTION_RESULT', { success: false, error: error.message });
         }
@@ -108,7 +110,7 @@ async function registerJuryHandlers(io, socket, gameState) {
                 action: 'COMMIT_RESULTS'
             });
 
-            console.log('[JURY] Değerlendirme tamamlandı, sonuçlar yayınlandı');
+            log.info('Jury degerlendirme tamamlandi');
         } catch (error) {
             socket.emit('JURY_ACTION_RESULT', { success: false, error: error.message });
         }
@@ -128,7 +130,7 @@ async function registerJuryHandlers(io, socket, gameState) {
 
     // Bağlantı kopması
     socket.on('disconnect', () => {
-        console.log(`[JURY] Ayrıldı: ${socket.id}`);
+        log.info({ socketId: socket.id }, 'Jury ayrildi');
     });
 }
 
