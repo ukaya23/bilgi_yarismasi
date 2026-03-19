@@ -7,9 +7,15 @@ ADD COLUMN IF NOT EXISTS competition_id INTEGER REFERENCES competitions(id) ON D
 
 CREATE INDEX IF NOT EXISTS idx_game_sessions_competition_id ON game_sessions(competition_id);
 
--- Add competition_id to contestants (already exists via foreign key)
--- contestants.competition_id already exists, just ensure index
+-- Add competition_id to contestants
+ALTER TABLE contestants
+ADD COLUMN IF NOT EXISTS competition_id INTEGER REFERENCES competitions(id) ON DELETE CASCADE;
+
+-- Remove table_no unique constraint (now unique per competition)
+ALTER TABLE contestants DROP CONSTRAINT IF EXISTS contestants_table_no_key;
+
 CREATE INDEX IF NOT EXISTS idx_contestants_competition_id ON contestants(competition_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_contestants_table_competition ON contestants(table_no, competition_id);
 
 -- Add competition_id to answers for proper isolation
 ALTER TABLE answers
