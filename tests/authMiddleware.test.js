@@ -8,7 +8,8 @@ process.env.JWT_REFRESH_EXPIRY = '7d';
 
 // Mock database
 jest.mock('../database/postgres', () => ({
-    isTokenRevoked: jest.fn()
+    isTokenRevoked: jest.fn(),
+    isTokenRevokedOrUserBanned: jest.fn()
 }));
 
 const db = require('../database/postgres');
@@ -32,6 +33,8 @@ describe('authenticateToken', () => {
     beforeEach(() => {
         db.isTokenRevoked.mockReset();
         db.isTokenRevoked.mockResolvedValue(false);
+        db.isTokenRevokedOrUserBanned.mockReset();
+        db.isTokenRevokedOrUserBanned.mockResolvedValue(false);
     });
 
     it('should pass with valid token and attach user', async () => {
@@ -73,7 +76,7 @@ describe('authenticateToken', () => {
     });
 
     it('should reject revoked token', async () => {
-        db.isTokenRevoked.mockResolvedValue(true);
+        db.isTokenRevokedOrUserBanned.mockResolvedValue(true);
 
         const tokens = generateTokenPair(testUser);
         const { req, res, next } = createMocks({
@@ -96,6 +99,8 @@ describe('authenticateRefreshToken', () => {
     beforeEach(() => {
         db.isTokenRevoked.mockReset();
         db.isTokenRevoked.mockResolvedValue(false);
+        db.isTokenRevokedOrUserBanned.mockReset();
+        db.isTokenRevokedOrUserBanned.mockResolvedValue(false);
     });
 
     it('should pass with valid refresh token', async () => {

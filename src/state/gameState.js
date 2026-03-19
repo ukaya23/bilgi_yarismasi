@@ -23,9 +23,6 @@ class GameState {
         this.answeredPlayers = new Set();
         this.currentRevealStep = 0; // Reveal adımı
         this.io = null;
-
-        // Singleton instance'ı sakla (backward compatibility için)
-        GameState.instance = this;
     }
 
     /**
@@ -201,8 +198,8 @@ class GameState {
         if (!this.currentQuestion) return;
 
         // 1. Önce cevap vermeyenler için boş cevap oluştur
-        const existingAnswers = await db.getAnswersForQuestion(this.currentQuestion.id);
-        const allContestants = await db.getAllContestants();
+        const existingAnswers = await db.getAnswersForQuestion(this.currentQuestion.id, this.competitionId);
+        const allContestants = await db.getAllContestants(this.competitionId);
         const answeredContestantIds = new Set(existingAnswers.map(a => a.contestant_id));
 
         for (const contestant of allContestants) {
@@ -217,7 +214,7 @@ class GameState {
         }
 
         // 2. Güncel cevap listesini al ve puanla
-        const answers = await db.getAnswersForQuestion(this.currentQuestion.id);
+        const answers = await db.getAnswersForQuestion(this.currentQuestion.id, this.competitionId);
         const correctKeys = this.currentQuestion.correct_keys;
 
         for (const answer of answers) {
@@ -246,8 +243,8 @@ class GameState {
         if (!this.currentQuestion || !this.io) return;
 
         // Cevapları ve tüm yarışmacıları al
-        let answers = await db.getAnswersForQuestion(this.currentQuestion.id);
-        const allContestants = await db.getAllContestants();
+        let answers = await db.getAnswersForQuestion(this.currentQuestion.id, this.competitionId);
+        const allContestants = await db.getAllContestants(this.competitionId);
 
         // Cevap vermeyenleri bul ve boş cevap olarak ekle
         const answeredContestantIds = new Set(answers.map(a => a.contestant_id));
@@ -265,7 +262,7 @@ class GameState {
         }
 
         // Cevapları tekrar çek (yeni eklenenler dahil)
-        answers = await db.getAnswersForQuestion(this.currentQuestion.id);
+        answers = await db.getAnswersForQuestion(this.currentQuestion.id, this.competitionId);
 
         // Boş cevapları otomatik olarak yanlış/0 puan işaretle (jüriye gönderme)
         const emptyAnswerIds = answers
@@ -421,8 +418,8 @@ class GameState {
 
         if (!this.currentQuestion || !this.io) return;
 
-        const answers = await db.getAnswersForQuestion(this.currentQuestion.id);
-        const leaderboard = await db.getLeaderboard();
+        const answers = await db.getAnswersForQuestion(this.currentQuestion.id, this.competitionId);
+        const leaderboard = await db.getLeaderboard(this.competitionId);
         const controlMode = await db.getSetting('screen_control_mode') || 'AUTO';
 
         // Tüm ekranlara sonuçları gönder (Başlangıç verisi)
@@ -505,13 +502,13 @@ class GameState {
      */
     async resetGame() {
         await this.goToIdle();
-        await db.resetAllContestants();
+        await db.resetAllContestants(this.competitionId);
 
         if (this.io) {
             this.io.emit('GAME_RESET');
             // Sıfırlama sonrası güncel yarışmacı listesi ve liderlik tablosunu gönder
-            const updatedContestants = await db.getAllContestants();
-            const updatedLeaderboard = await db.getLeaderboard();
+            const updatedContestants = await db.getAllContestants(this.competitionId);
+            const updatedLeaderboard = await db.getLeaderboard(this.competitionId);
             this.io.emit('CONTESTANTS_UPDATED', updatedContestants);
             this.io.emit('LEADERBOARD_UPDATED', updatedLeaderboard);
         }
@@ -520,9 +517,4 @@ class GameState {
     }
 }
 
-// Singleton instance for backward compatibility
-const gameStateInstance = new GameState();
-
-// Export both the class and singleton instance
-module.exports = gameStateInstance;
-module.exports.GameState = GameState;
+module.exports = { GameState };

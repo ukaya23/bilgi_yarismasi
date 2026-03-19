@@ -34,7 +34,7 @@ async function socketAuthMiddleware(socket, next) {
         const decoded = verifyToken(token);
 
         // Check if token is revoked
-        const isRevoked = await db.isTokenRevoked(decoded.tokenId);
+        const isRevoked = await db.isTokenRevokedOrUserBanned(decoded.tokenId, decoded.userId, decoded.iat);
         if (isRevoked) {
             return next(new Error('Token has been revoked'));
         }
@@ -90,7 +90,7 @@ async function optionalSocketAuth(socket, next) {
 
         if (token) {
             const decoded = verifyToken(token);
-            const isRevoked = await db.isTokenRevoked(decoded.tokenId);
+            const isRevoked = await db.isTokenRevokedOrUserBanned(decoded.tokenId, decoded.userId, decoded.iat);
 
             if (!isRevoked) {
                 socket.userId = decoded.userId;

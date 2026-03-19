@@ -20,6 +20,7 @@ jest.mock('../database/postgres', () => ({
 
 const db = require('../database/postgres');
 const { GameState } = require('../src/state/gameState');
+// GameState now exports { GameState } class - no singleton
 
 // Helper: create fresh GameState with mock IO
 function createGameState() {
@@ -430,7 +431,58 @@ describe('GameState - goToIdle & resetGame', () => {
         await gs.resetGame();
 
         expect(gs.state).toBe('IDLE');
-        expect(db.resetAllContestants).toHaveBeenCalled();
+        expect(db.resetAllContestants).toHaveBeenCalledWith(1); // competitionId
         expect(gs.io.emit).toHaveBeenCalledWith('GAME_RESET');
+    });
+});
+
+describe('GameState - Competition Isolation', () => {
+    it('should pass competitionId to DB queries in autoGradeMultipleChoice', async () => {
+        jest.clearAllMocks();
+        const gs = new GameState(5);
+        gs.io = { emit: jest.fn(), to: jest.fn().mockReturnValue({ emit: jest.fn() }) };
+
+        db.getQuestionById.mockResolvedValue(mockQuestion);
+        db.getAllQuestions.mockResolvedValue([mockQuestion]);
+        db.getAnswersForQuestion.mockResolvedValue([]);
+        db.getAllContestants.mockResolvedValue([]);
+        db.getSetting.mockResolvedValue('AUTO');
+        db.getLeaderboard.mockResolvedValue([]);
+        db.getRandomQuote.mockResolvedValue({ text: 'Test', author: 'Author' });
+
+        await gs.startQuestion(1);
+        if (gs.timer) { clearInterval(gs.timer); gs.timer = null; }
+
+        // Manually trigger autoGrade
+        await gs.autoGradeMultipleChoice();
+
+        // Verify competitionId=5 is passed to DB calls
+        expect(db.getAnswersForQuestion).toHaveBeenCalledWith(1, 5);
+        expect(db.getAllContestants).toHaveBeenCalledWith(5);
+    });
+
+    it('should pass competitionId to resetAllContestants', async () => {
+        jest.clearAllMocks();
+        const gs = new GameState(3);
+        gs.io = { emit: jest.fn(), to: jest.fn().mockReturnValue({ emit: jest.fn() }) };
+        db.resetAllContestants.mockResolvedValue();
+        db.getAllContestants.mockResolvedValue([]);
+        db.getLeaderboard.mockResolvedValue([]);
+
+        await gs.resetGame();
+
+        expect(db.resetAllContestants).toHaveBeenCalledWith(3);
+        expect(db.getAllContestants).toHaveBeenCalledWith(3);
+        expect(db.getLeaderboard).toHaveBeenCalledWith(3);
+    });
+
+    it('should use different competitionIds for separate GameState instances', () => {
+        const gs1 = new GameState(1);
+        const gs2 = new GameState(2);
+
+        expect(gs1.competitionId).toBe(1);
+        expect(gs2.competitionId).toBe(2);
+        expect(gs1.getState().competitionId).toBe(1);
+        expect(gs2.getState().competitionId).toBe(2);
     });
 });

@@ -22,8 +22,8 @@ async function authenticateToken(req, res, next) {
         // Verify token
         const decoded = verifyToken(token);
 
-        // Check if token is revoked
-        const isRevoked = await db.isTokenRevoked(decoded.tokenId);
+        // Check if token is revoked (including user-level revocation)
+        const isRevoked = await db.isTokenRevokedOrUserBanned(decoded.tokenId, decoded.userId, decoded.iat);
         if (isRevoked) {
             return res.status(401).json({
                 success: false,
@@ -74,8 +74,8 @@ async function authenticateRefreshToken(req, res, next) {
             });
         }
 
-        // Check if token is revoked
-        const isRevoked = await db.isTokenRevoked(decoded.tokenId);
+        // Check if token is revoked (including user-level revocation)
+        const isRevoked = await db.isTokenRevokedOrUserBanned(decoded.tokenId, decoded.userId, decoded.iat);
         if (isRevoked) {
             return res.status(401).json({
                 success: false,
@@ -134,7 +134,7 @@ async function optionalAuth(req, res, next) {
 
         if (token) {
             const decoded = verifyToken(token);
-            const isRevoked = await db.isTokenRevoked(decoded.tokenId);
+            const isRevoked = await db.isTokenRevokedOrUserBanned(decoded.tokenId, decoded.userId, decoded.iat);
 
             if (!isRevoked) {
                 req.user = {

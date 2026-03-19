@@ -4,6 +4,7 @@
  */
 
 const { GameState } = require('./gameState');
+// CompetitionManager is the sole creator of GameState instances
 const db = require('../../database/postgres');
 
 class CompetitionManager {

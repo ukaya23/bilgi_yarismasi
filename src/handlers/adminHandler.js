@@ -3,21 +3,21 @@
  */
 
 const db = require('../../database/postgres');
-const gameState = require('../state/gameState');
 
-async function registerAdminHandlers(io, socket) {
+async function registerAdminHandlers(io, socket, gameState) {
     console.log(`[ADMIN] Bağlandı: ${socket.id}`);
 
     // Admin odasına katıl
     socket.join('admin');
 
     // İlk durumu gönder
+    const competitionId = gameState.competitionId;
     socket.emit('INIT_DATA', {
         questions: await db.getAllQuestions(),
-        contestants: await db.getAllContestants(),
+        contestants: await db.getAllContestants(competitionId),
         gameState: gameState.getState(),
-        leaderboard: await db.getLeaderboard(),
-        askedQuestionIds: await db.getAskedQuestionIds()
+        leaderboard: await db.getLeaderboard(competitionId),
+        askedQuestionIds: await db.getAskedQuestionIds(competitionId)
     });
 
     // Soru başlat
@@ -64,7 +64,7 @@ async function registerAdminHandlers(io, socket) {
     // Kürsüyü Göster
     socket.on('ADMIN_SHOW_PODIUM', async () => {
         try {
-            const leaderboard = await db.getLeaderboard();
+            const leaderboard = await db.getLeaderboard(competitionId);
             gameState.io.emit('SHOW_PODIUM', { leaderboard: leaderboard.slice(0, 3) });
             socket.emit('ACTION_RESULT', { success: true, action: 'SHOW_PODIUM' });
         } catch (error) {
@@ -124,7 +124,7 @@ async function registerAdminHandlers(io, socket) {
 
     // Yarışmacıları yenile
     socket.on('ADMIN_REFRESH_CONTESTANTS', async () => {
-        socket.emit('CONTESTANTS_UPDATED', await db.getAllContestants());
+        socket.emit('CONTESTANTS_UPDATED', await db.getAllContestants(competitionId));
     });
 
     // Sonuç açıklama adımını ilerlet
@@ -133,15 +133,6 @@ async function registerAdminHandlers(io, socket) {
             gameState.nextRevealStep();
         }
     });
-
-    // Yarışmayı sonlandır
-    // Note: The following line `app.post` is typically used for Express.js routes and 'app' is not defined in this scope.
-    // It has been placed as requested, but may require 'app' to be passed into this function or defined globally.
-    // Also, the closing brace '}' after this line in the original instruction would prematurely close 'registerAdminHandlers'.
-    // It has been adjusted to maintain syntactical correctness of the function.
-    // app.post('/api/competition/end', requireAdminAuth, (req, res) => {
-    //     console.log(`[ADMIN] Ayrıldı: ${socket.id}`);
-    // });
 
     // Bağlantı kopması
     socket.on('disconnect', () => {

@@ -43,7 +43,6 @@ const upload = multer({
 
 // Veritabanı ve State
 const db = require('./database/postgres');
-const gameState = require('./src/state/gameState');
 const competitionManager = require('./src/state/competitionManager');
 
 // Event Handler'lar
@@ -270,7 +269,9 @@ app.post('/api/competition/end', authenticateToken, requireRole('admin'), async 
         if (activeCompetition) {
             await db.updateCompetitionStatus(activeCompetition.id, 'COMPLETED');
             await db.resetAllAccessCodes(activeCompetition.id); // Kodları da sıfırla ki tekrar kullanılabilsin (opsiyonel)
-            await gameState.resetGame(); // Oyunu da resetle
+            const gs = competitionManager.getGameState(activeCompetition.id);
+            await gs.resetGame(); // Oyunu da resetle
+            competitionManager.removeGameState(activeCompetition.id);
             console.log('[COMPETITION] Yarışma sonlandırıldı:', activeCompetition.id);
         }
         res.json({ success: true });
@@ -423,17 +424,22 @@ app.get('/api/questions', async (req, res) => {
 
 // Yarışmacılar API
 app.get('/api/contestants', async (req, res) => {
-    res.json(await db.getAllContestants());
+    const competitionId = req.query.competitionId ? parseInt(req.query.competitionId) : null;
+    res.json(await db.getAllContestants(competitionId));
 });
 
 // Liderlik Tablosu API
 app.get('/api/leaderboard', async (req, res) => {
-    res.json(await db.getLeaderboard());
+    const competitionId = req.query.competitionId ? parseInt(req.query.competitionId) : null;
+    res.json(await db.getLeaderboard(competitionId));
 });
 
 // Oyun Durumu API
-app.get('/api/state', (req, res) => {
-    res.json(gameState.getState());
+app.get('/api/state', async (req, res) => {
+    // Aktif yarışmanın durumunu döndür
+    const activeComp = await db.getActiveCompetition();
+    const compId = activeComp ? activeComp.id : 1;
+    res.json(competitionManager.getGameState(compId).getState());
 });
 
 // ==================== SOCKET.IO ====================
@@ -458,18 +464,21 @@ io.on('connection', (socket) => {
         // Store competition ID on socket
         socket.competitionId = competitionId;
 
+        // Get competition-specific game state
+        const gameState = competitionManager.getGameState(competitionId);
+
         switch (socket.role) {
             case 'admin':
-                registerAdminHandlers(io, socket);
+                registerAdminHandlers(io, socket, gameState);
                 break;
             case 'player':
-                registerPlayerHandlers(io, socket);
+                registerPlayerHandlers(io, socket, gameState);
                 break;
             case 'jury':
-                registerJuryHandlers(io, socket);
+                registerJuryHandlers(io, socket, gameState);
                 break;
             case 'screen':
-                registerScreenHandlers(io, socket);
+                registerScreenHandlers(io, socket, gameState);
                 break;
         }
     }
@@ -477,7 +486,8 @@ io.on('connection', (socket) => {
     // Auth'suz bağlantılar sadece screen (seyirci) olarak işlenir
     if (!socket.role) {
         console.log(`[SOCKET] Unauthenticated connection -> screen handler: ${socket.id}`);
-        registerScreenHandlers(io, socket);
+        const defaultGameState = competitionManager.getGameState(1);
+        registerScreenHandlers(io, socket, defaultGameState);
     }
 
     // Genel bağlantı kopması
@@ -501,9 +511,6 @@ async function startServer() {
 
         // CompetitionManager'ı initialize et
         competitionManager.setIO(io);
-
-        // GameState'e io referansını ver (backward compatibility)
-        gameState.setIO(io);
 
         // HTTP sunucusunu başlat
         httpServer.listen(PORT, HOST, () => {

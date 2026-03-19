@@ -133,9 +133,17 @@ class PostgresDatabase {
     // ==================== YARIŞMACI İŞLEMLERİ ====================
 
     /**
-     * Tüm yarışmacıları getir
+     * Tüm yarışmacıları getir (competitionId verilirse filtrele)
      */
-    async getAllContestants() {
+    async getAllContestants(competitionId = null) {
+        if (competitionId) {
+            return (await this.pool.query(`
+                SELECT id, name, table_no, total_score, status, socket_id
+                FROM contestants
+                WHERE competition_id = $1
+                ORDER BY table_no
+            `, [competitionId])).rows;
+        }
         const result = await this.pool.query(`
             SELECT id, name, table_no, total_score, status, socket_id
             FROM contestants
@@ -230,9 +238,17 @@ class PostgresDatabase {
     }
 
     /**
-     * Liderlik tablosunu getir
+     * Liderlik tablosunu getir (competitionId verilirse filtrele)
      */
-    async getLeaderboard() {
+    async getLeaderboard(competitionId = null) {
+        if (competitionId) {
+            return (await this.pool.query(`
+                SELECT id, name, table_no, total_score
+                FROM contestants
+                WHERE status != 'DISQUALIFIED' AND competition_id = $1
+                ORDER BY total_score DESC, name ASC
+            `, [competitionId])).rows;
+        }
         const result = await this.pool.query(`
             SELECT id, name, table_no, total_score
             FROM contestants
@@ -243,23 +259,32 @@ class PostgresDatabase {
     }
 
     /**
-     * Tüm yarışmacıları sil (reset için)
+     * Yarışmacıları sil (competitionId verilirse sadece o yarışmanınkileri)
      */
-    async resetAllContestants() {
+    async resetAllContestants(competitionId = null) {
         const client = await this.pool.connect();
         try {
             await client.query('BEGIN');
-            // TRUNCATE yerine yetki ve lock sorunlarını önlemek adına DELETE kullanıyoruz
-            await client.query('DELETE FROM answers');
-            await client.query('DELETE FROM contestants');
 
-            // Opsiyonel: ID'leri sıfırlamaya çalış
-            try {
-                await client.query('ALTER SEQUENCE answers_id_seq RESTART WITH 1');
-                await client.query('ALTER SEQUENCE contestants_id_seq RESTART WITH 1');
-            } catch (seqError) {
-                // Ignore sequence reset errors
-                console.log('[DB] Sequence reset atlanıyor (yetki veya SQLite):', seqError.message);
+            if (competitionId) {
+                // Sadece bu yarışmaya ait cevapları ve yarışmacıları sil
+                await client.query(`
+                    DELETE FROM answers WHERE contestant_id IN (
+                        SELECT id FROM contestants WHERE competition_id = $1
+                    )
+                `, [competitionId]);
+                await client.query('DELETE FROM contestants WHERE competition_id = $1', [competitionId]);
+            } else {
+                await client.query('DELETE FROM answers');
+                await client.query('DELETE FROM contestants');
+
+                // Opsiyonel: ID'leri sıfırlamaya çalış
+                try {
+                    await client.query('ALTER SEQUENCE answers_id_seq RESTART WITH 1');
+                    await client.query('ALTER SEQUENCE contestants_id_seq RESTART WITH 1');
+                } catch (seqError) {
+                    console.log('[DB] Sequence reset atlanıyor:', seqError.message);
+                }
             }
 
             await client.query('COMMIT');
@@ -320,9 +345,19 @@ class PostgresDatabase {
     }
 
     /**
-     * Bir soruya verilen tüm cevapları getir
+     * Bir soruya verilen tüm cevapları getir (competitionId verilirse filtrele)
      */
-    async getAnswersForQuestion(questionId) {
+    async getAnswersForQuestion(questionId, competitionId = null) {
+        if (competitionId) {
+            return (await this.pool.query(`
+                SELECT a.id, a.answer_text, a.is_correct, a.points_awarded, a.time_remaining,
+                       c.id as contestant_id, c.name, c.table_no
+                FROM answers a
+                JOIN contestants c ON a.contestant_id = c.id
+                WHERE a.question_id = $1 AND c.competition_id = $2
+                ORDER BY a.submit_time ASC
+            `, [questionId, competitionId])).rows;
+        }
         const result = await this.pool.query(`
             SELECT a.id, a.answer_text, a.is_correct, a.points_awarded, a.time_remaining,
                    c.id as contestant_id, c.name, c.table_no
@@ -335,9 +370,18 @@ class PostgresDatabase {
     }
 
     /**
-     * Daha önce sorulmuş soru ID'lerini getir
+     * Daha önce sorulmuş soru ID'lerini getir (competitionId verilirse filtrele)
      */
-    async getAskedQuestionIds() {
+    async getAskedQuestionIds(competitionId = null) {
+        if (competitionId) {
+            const result = await this.pool.query(`
+                SELECT DISTINCT a.question_id
+                FROM answers a
+                JOIN contestants c ON a.contestant_id = c.id
+                WHERE c.competition_id = $1
+            `, [competitionId]);
+            return result.rows.map(r => r.question_id);
+        }
         const result = await this.pool.query(
             'SELECT DISTINCT question_id FROM answers'
         );
@@ -784,17 +828,44 @@ class PostgresDatabase {
 
     /**
      * Kullanıcının tüm token'larını iptal et
+     * user_id bazlı revoke kaydı oluşturur - isTokenRevoked kontrolü bunu da kontrol etmeli
      */
     async revokeAllUserTokens(userId, reason = 'logout_all') {
+        // Kullanıcı bazlı revoke timestamp'i kaydet
+        // isTokenRevoked bu timestamp'ten önce oluşturulan tüm token'ları geçersiz sayacak
         const result = await this.pool.query(`
             INSERT INTO revoked_tokens (token_id, user_id, reason)
-            SELECT gen_random_uuid(), $1, $2
-            WHERE NOT EXISTS (
-                SELECT 1 FROM revoked_tokens WHERE user_id = $1
-            )
+            VALUES ($1, $2, $3)
             RETURNING *
-        `, [userId, reason]);
+        `, [`user_revoke_all_${userId}_${Date.now()}`, userId, reason]);
         return result.rowCount;
+    }
+
+    /**
+     * Token'ın iptal edilip edilmediğini kontrol et (user-level revoke dahil)
+     */
+    async isTokenRevokedOrUserBanned(tokenId, userId, tokenIssuedAt) {
+        // 1. Token ID bazlı kontrol
+        const tokenCheck = await this.pool.query(
+            'SELECT EXISTS(SELECT 1 FROM revoked_tokens WHERE token_id = $1) as revoked',
+            [tokenId]
+        );
+        if (tokenCheck.rows[0].revoked) return true;
+
+        // 2. User bazlı toplu revoke kontrolü - token'ın oluşturulma zamanından sonra revoke yapılmış mı?
+        if (userId && tokenIssuedAt) {
+            const userCheck = await this.pool.query(`
+                SELECT EXISTS(
+                    SELECT 1 FROM revoked_tokens
+                    WHERE user_id = $1
+                    AND token_id LIKE 'user_revoke_all_%'
+                    AND revoked_at > $2
+                ) as revoked
+            `, [userId, new Date(tokenIssuedAt * 1000)]);
+            if (userCheck.rows[0].revoked) return true;
+        }
+
+        return false;
     }
 
     /**

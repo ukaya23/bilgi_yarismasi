@@ -3,12 +3,11 @@
  */
 
 const db = require('../../database/postgres');
-const gameState = require('../state/gameState');
 
 // Socket ID -> Contestant ID mapping (reconnect için)
 const socketContestantMap = new Map();
 
-function registerPlayerHandlers(io, socket) {
+function registerPlayerHandlers(io, socket, gameState) {
     console.log(`[PLAYER] Bağlandı: ${socket.id}`);
 
     // Socket'e contestant bilgisini ekle
@@ -52,7 +51,8 @@ function registerPlayerHandlers(io, socket) {
             }
 
             // Yarışmacıyı veritabanına ekle/güncelle
-            const contestantId = await db.upsertContestant(name, parseInt(tableNo));
+            const competitionId = gameState.competitionId;
+            const contestantId = await db.upsertContestant(name, parseInt(tableNo), competitionId);
             await db.updateContestantSocket(contestantId, socket.id);
 
             // Socket'e contestant ID'yi kaydet
@@ -73,8 +73,9 @@ function registerPlayerHandlers(io, socket) {
             socket.emit('GAME_STATE', gameState.getState());
 
             // Tüm admin ve seyircilere bildir
-            io.to('admin').emit('CONTESTANTS_UPDATED', await db.getAllContestants());
-            io.to('screen').emit('CONTESTANTS_UPDATED', await db.getAllContestants());
+            const contestants = await db.getAllContestants(competitionId);
+            io.to('admin').emit('CONTESTANTS_UPDATED', contestants);
+            io.to('screen').emit('CONTESTANTS_UPDATED', contestants);
 
             console.log(`[PLAYER] Giriş başarılı: ${name} (Masa ${tableNo}) - Contestant ID: ${contestantId}`);
         } catch (error) {
@@ -125,8 +126,9 @@ function registerPlayerHandlers(io, socket) {
         if (contestantId) {
             await db.updateContestantStatus(contestantId, 'OFFLINE');
             socketContestantMap.delete(socket.id);
-            io.to('admin').emit('CONTESTANTS_UPDATED', await db.getAllContestants());
-            io.to('screen').emit('CONTESTANTS_UPDATED', await db.getAllContestants());
+            const contestants = await db.getAllContestants(gameState.competitionId);
+            io.to('admin').emit('CONTESTANTS_UPDATED', contestants);
+            io.to('screen').emit('CONTESTANTS_UPDATED', contestants);
             console.log(`[PLAYER] Ayrıldı: Yarışmacı ${contestantId}`);
         }
     });

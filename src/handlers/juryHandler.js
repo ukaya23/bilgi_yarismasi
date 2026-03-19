@@ -3,9 +3,8 @@
  */
 
 const db = require('../../database/postgres');
-const gameState = require('../state/gameState');
 
-async function registerJuryHandlers(io, socket) {
+async function registerJuryHandlers(io, socket, gameState) {
     console.log(`[JURY] Bağlandı: ${socket.id}`);
 
     // Jüri odasına katıl
@@ -37,7 +36,7 @@ async function registerJuryHandlers(io, socket) {
     // GRADING durumundaysa cevap verilerini tekrar gönder
     if (currentState.state === 'GRADING' && gameState.currentQuestion) {
         try {
-            const answers = await db.getAnswersForQuestion(gameState.currentQuestion.id);
+            const answers = await db.getAnswersForQuestion(gameState.currentQuestion.id, gameState.competitionId);
             const emptyAnswers = answers.filter(a => !a.answer_text || a.answer_text.trim() === '');
             const nonEmptyAnswers = answers.filter(a => a.answer_text && a.answer_text.trim() !== '');
             const groupedAnswers = gameState.groupAnswers(nonEmptyAnswers);
@@ -119,7 +118,7 @@ async function registerJuryHandlers(io, socket) {
     socket.on('JURY_REQUEST_ANSWERS', async (data) => {
         try {
             const { questionId } = data;
-            const answers = await db.getAnswersForQuestion(questionId);
+            const answers = await db.getAnswersForQuestion(questionId, gameState.competitionId);
 
             socket.emit('JURY_ANSWERS_DATA', { questionId, answers });
         } catch (error) {

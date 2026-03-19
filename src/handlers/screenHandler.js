@@ -3,9 +3,8 @@
  */
 
 const db = require('../../database/postgres');
-const gameState = require('../state/gameState');
 
-async function registerScreenHandlers(io, socket) {
+async function registerScreenHandlers(io, socket, gameState) {
     console.log(`[SCREEN] Bağlandı: ${socket.id}`);
 
     // Screen odasına katıl
@@ -13,9 +12,10 @@ async function registerScreenHandlers(io, socket) {
 
     // İlk verileri gönder
     const currentState = gameState.getState();
+    const competitionId = gameState.competitionId;
     const initPayload = {
-        contestants: await db.getAllContestants(),
-        leaderboard: await db.getLeaderboard(),
+        contestants: await db.getAllContestants(competitionId),
+        leaderboard: await db.getLeaderboard(competitionId),
         gameState: currentState,
         quote: await db.getRandomQuote()
     };
