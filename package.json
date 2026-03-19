@@ -5,7 +5,9 @@
   "main": "server.js",
   "scripts": {
     "start": "echo \"Lütfen projeyi Docker ile çalıştırın: docker-compose up -d\" && exit 1",
-    "dev": "echo \"Lütfen projeyi Docker ile çalıştırın: docker-compose up -d\" && exit 1"
+    "dev": "echo \"Lütfen projeyi Docker ile çalıştırın: docker-compose up -d\" && exit 1",
+    "test": "jest --verbose",
+    "test:watch": "jest --watch"
   },
   "keywords": [
     "quiz",
@@ -25,5 +27,8 @@
     "pg": "^8.11.3",
     "socket.io": "^4.7.4",
     "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "jest": "^30.3.0"
   }
 }
