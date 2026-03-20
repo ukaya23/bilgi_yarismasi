@@ -1,4 +1,5 @@
 import { Pool } from 'pg';
+import log from '../../src/utils/logger';
 
 export interface EventLogEntry {
     eventType: string;
@@ -14,18 +15,22 @@ export class EventLogRepository {
     constructor(private pool: Pool) {}
 
     async log(entry: EventLogEntry): Promise<void> {
-        await this.pool.query(`
-            INSERT INTO event_log (event_type, actor_type, actor_id, actor_name, competition_id, question_id, payload)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
-        `, [
-            entry.eventType,
-            entry.actorType,
-            entry.actorId ?? null,
-            entry.actorName ?? null,
-            entry.competitionId ?? null,
-            entry.questionId ?? null,
-            JSON.stringify(entry.payload ?? {}),
-        ]);
+        try {
+            await this.pool.query(`
+                INSERT INTO event_log (event_type, actor_type, actor_id, actor_name, competition_id, question_id, payload)
+                VALUES ($1, $2, $3, $4, $5, $6, $7)
+            `, [
+                entry.eventType,
+                entry.actorType,
+                entry.actorId ?? null,
+                entry.actorName ?? null,
+                entry.competitionId ?? null,
+                entry.questionId ?? null,
+                JSON.stringify(entry.payload ?? {}),
+            ]);
+        } catch (err) {
+            log.warn({ err, eventType: entry.eventType }, 'Event log write failed');
+        }
     }
 
     async getByCompetition(competitionId: number, limit = 100, offset = 0): Promise<unknown[]> {

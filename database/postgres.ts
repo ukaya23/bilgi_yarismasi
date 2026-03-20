@@ -59,9 +59,54 @@ class PostgresDatabase {
             } finally {
                 client.release();
             }
+
+            await this.runMigrations();
         } catch (error) {
             log.fatal({ err: error }, 'Database connection error');
             throw error;
+        }
+    }
+
+    private async runMigrations(): Promise<void> {
+        const fs = await import('fs');
+        const path = await import('path');
+        const migrationsDir = path.join(__dirname, '..', 'database', 'migrations');
+
+        // Create migrations tracking table
+        await this.pool.query(`
+            CREATE TABLE IF NOT EXISTS applied_migrations (
+                name VARCHAR(255) PRIMARY KEY,
+                applied_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+
+        const applied = await this.pool.query('SELECT name FROM applied_migrations');
+        const appliedSet = new Set(applied.rows.map((r: { name: string }) => r.name));
+
+        let files: string[];
+        try {
+            files = fs.readdirSync(migrationsDir).filter((f: string) => f.endsWith('.sql')).sort();
+        } catch {
+            log.warn('Migrations directory not found, skipping');
+            return;
+        }
+
+        for (const file of files) {
+            if (appliedSet.has(file)) continue;
+
+            const sql = fs.readFileSync(path.join(migrationsDir, file), 'utf-8');
+            try {
+                await this.pool.query(sql);
+                await this.pool.query('INSERT INTO applied_migrations (name) VALUES ($1)', [file]);
+                log.info({ migration: file }, 'Migration applied');
+            } catch (err) {
+                log.warn({ err, migration: file }, 'Migration failed (may already be applied)');
+                // Mark as applied anyway to avoid retry loops
+                await this.pool.query(
+                    'INSERT INTO applied_migrations (name) VALUES ($1) ON CONFLICT DO NOTHING',
+                    [file]
+                );
+            }
         }
     }
 

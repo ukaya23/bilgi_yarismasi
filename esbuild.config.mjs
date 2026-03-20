@@ -11,10 +11,11 @@
 import * as esbuild from 'esbuild';
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 
-const PUBLIC_DIR = path.join(import.meta.dirname, 'public');
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const PUBLIC_DIR = path.join(__dirname, 'public');
 const JS_DIR = path.join(PUBLIC_DIR, 'js');
-const SRC_DIR = path.join(JS_DIR, 'src');
 const DIST_DIR = path.join(PUBLIC_DIR, 'dist');
 
 // ES Module entry points (proper import/export bundling)
