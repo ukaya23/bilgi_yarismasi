@@ -47,6 +47,7 @@ export class GameState {
     io: Server | null;
     gameTimer: GameTimer;
     revealManager: RevealManager;
+    lastResults: any | null;
 
     constructor(competitionId: number = 1) {
         this.competitionId = competitionId;
@@ -56,6 +57,7 @@ export class GameState {
         this.questions = [];
         this.answeredPlayers = new Set();
         this.io = null;
+        this.lastResults = null;
 
         this.gameTimer = new GameTimer();
         this.revealManager = new RevealManager();
@@ -72,6 +74,10 @@ export class GameState {
 
     get timeRemaining(): number {
         return this.gameTimer.timeRemaining;
+    }
+
+    hasPlayerAnswered(contestantId: number): boolean {
+        return this.answeredPlayers.has(contestantId);
     }
 
     getState() {
@@ -292,7 +298,7 @@ export class GameState {
         const leaderboard = await db.getLeaderboard(this.competitionId);
         const controlMode = await db.getSetting('screen_control_mode') || 'AUTO';
 
-        this.broadcast('SHOW_RESULTS', {
+        this.lastResults = {
             question: {
                 content: this.currentQuestion.content,
                 correctAnswer: this.currentQuestion.correct_keys[0] || '',
@@ -302,7 +308,9 @@ export class GameState {
             answers: answers,
             leaderboard: leaderboard,
             mode: controlMode
-        });
+        };
+
+        this.broadcast('SHOW_RESULTS', this.lastResults);
 
         if (controlMode === 'MANUAL') {
             this.revealManager.notifyAdmin(this.io, 0);
@@ -320,6 +328,7 @@ export class GameState {
         this.currentQuestion = null;
         this.questionStartTime = null;
         this.answeredPlayers.clear();
+        this.lastResults = null;
 
         await this.setState('IDLE');
     }

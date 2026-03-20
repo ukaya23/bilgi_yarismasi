@@ -33,6 +33,11 @@ export async function registerScreenHandlers(io: Server, socket: Socket, gameSta
         };
     }
 
+    // Resend results if screen reconnects during REVEAL
+    if (currentState.state === 'REVEAL' && gameState.lastResults) {
+        initPayload.lastResults = gameState.lastResults;
+    }
+
     socket.emit('INIT_DATA', initPayload);
 
     socket.on('SCREEN_REQUEST_QUOTE', async () => {

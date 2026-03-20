@@ -348,7 +348,12 @@ function setupSocketEvents() {
             }
         }
 
-        if (data.quote && !data.activeQuestion) showQuote(data.quote);
+        // Resend results if screen reconnects during REVEAL
+        if (data.lastResults) {
+            showResults(data.lastResults);
+        } else if (data.quote && !data.activeQuestion) {
+            showQuote(data.quote);
+        }
     });
 
     socketManager.on('GAME_STATE', (data) => {

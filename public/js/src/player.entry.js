@@ -82,7 +82,8 @@ function initializeSocket() {
     setupSocketEvents();
     updateConnectionStatus();
 
-    socketManager.onReconnect(() => {
+    // Send login on every connect (initial + reconnect)
+    socketManager.getSocket().on('connect', () => {
         if (playerData) {
             socketManager.emit('PLAYER_LOGIN', {
                 name: playerData.name,
@@ -124,13 +125,22 @@ function setupEventListeners() {
 
 function setupSocketEvents() {
     socketManager.on('INIT_DATA', (data) => {
-        if (playerData) {
-            socketManager.emit('PLAYER_LOGIN', {
-                name: playerData.name,
-                tableNo: playerData.tableNo
-            });
+        // INIT_DATA now arrives after PLAYER_LOGIN with full reconnection state
+
+        // If player already answered current question, restore submitted state
+        if (data.alreadyAnswered) {
+            hasSubmitted = true;
+            showSubmittedScreen();
+            return;
         }
 
+        // If we're in REVEAL/GRADING and results are available, show them
+        if (data.lastResults) {
+            showResults(data.lastResults);
+            return;
+        }
+
+        // Active question - show it (page refresh during question)
         if (data.activeQuestion && playerData && !hasSubmitted) {
             currentQuestion = data.activeQuestion;
             showQuestion(data.activeQuestion);

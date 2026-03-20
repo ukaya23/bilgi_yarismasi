@@ -21,25 +21,8 @@ export function registerPlayerHandlers(io: Server, socket: PlayerSocket, gameSta
     socket.contestantId = null;
     socket.join('player');
 
-    const currentState = gameState.getState();
-    const initPayload: any = { gameState: currentState };
-
-    if (currentState.state === 'QUESTION_ACTIVE' && gameState.currentQuestion) {
-        initPayload.activeQuestion = {
-            id: gameState.currentQuestion.id,
-            content: gameState.currentQuestion.content,
-            type: gameState.currentQuestion.type,
-            options: gameState.currentQuestion.options,
-            points: gameState.currentQuestion.points,
-            duration: gameState.currentQuestion.duration,
-            media_url: gameState.currentQuestion.media_url,
-            index: gameState.currentQuestion.index,
-            total: gameState.currentQuestion.total,
-            timeRemaining: gameState.timeRemaining
-        };
-    }
-
-    socket.emit('INIT_DATA', initPayload);
+    // INIT_DATA is sent after PLAYER_LOGIN so we know the contestantId
+    // See PLAYER_LOGIN handler below for the full reconnection flow
 
     socket.on('PLAYER_LOGIN', async (data: unknown) => {
         try {
@@ -62,7 +45,33 @@ export function registerPlayerHandlers(io: Server, socket: PlayerSocket, gameSta
                 tableNo
             });
 
-            socket.emit('GAME_STATE', gameState.getState());
+            // Build and send full INIT_DATA with player's answer status
+            const currentState = gameState.getState();
+            const initPayload: any = { gameState: currentState };
+
+            if (currentState.state === 'QUESTION_ACTIVE' && gameState.currentQuestion) {
+                const alreadyAnswered = gameState.hasPlayerAnswered(contestantId);
+                initPayload.activeQuestion = {
+                    id: gameState.currentQuestion.id,
+                    content: gameState.currentQuestion.content,
+                    type: gameState.currentQuestion.type,
+                    options: gameState.currentQuestion.options,
+                    points: gameState.currentQuestion.points,
+                    duration: gameState.currentQuestion.duration,
+                    media_url: gameState.currentQuestion.media_url,
+                    index: gameState.currentQuestion.index,
+                    total: gameState.currentQuestion.total,
+                    timeRemaining: gameState.timeRemaining
+                };
+                initPayload.alreadyAnswered = alreadyAnswered;
+            }
+
+            // If we're in REVEAL phase and results are available, resend them
+            if ((currentState.state === 'REVEAL' || currentState.state === 'GRADING') && gameState.lastResults) {
+                initPayload.lastResults = gameState.lastResults;
+            }
+
+            socket.emit('INIT_DATA', initPayload);
 
             const contestants = await db.getAllContestants(competitionId);
             io.to('admin').emit('CONTESTANTS_UPDATED', contestants);
