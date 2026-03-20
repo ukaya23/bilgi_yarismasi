@@ -89,6 +89,7 @@ export async function registerAdminHandlers(io: Server, socket: Socket, gameStat
             const validated = validatePayload(AdminAddQuestionSchema, data, socket, 'ADMIN_ADD_QUESTION');
             if (!validated) return;
             const id = await db.addQuestion(validated);
+            db.logEvent({ eventType: 'QUESTION_ADDED', actorType: 'admin', competitionId, questionId: id, payload: { content: validated.content } });
             io.to('admin').emit('QUESTIONS_UPDATED', await db.getAllQuestions());
             socket.emit('ACTION_RESULT', { success: true, action: 'ADD_QUESTION', id });
         } catch (error: any) {
@@ -102,6 +103,7 @@ export async function registerAdminHandlers(io: Server, socket: Socket, gameStat
             if (!validated) return;
             const { id, ...question } = validated;
             await db.updateQuestion(id, question);
+            db.logEvent({ eventType: 'QUESTION_UPDATED', actorType: 'admin', competitionId, questionId: id });
             io.to('admin').emit('QUESTIONS_UPDATED', await db.getAllQuestions());
             socket.emit('ACTION_RESULT', { success: true, action: 'UPDATE_QUESTION' });
         } catch (error: any) {
@@ -114,6 +116,7 @@ export async function registerAdminHandlers(io: Server, socket: Socket, gameStat
             const validated = validatePayload(AdminDeleteQuestionSchema, data, socket, 'ADMIN_DELETE_QUESTION');
             if (!validated) return;
             await db.deleteQuestion(validated.id);
+            db.logEvent({ eventType: 'QUESTION_DELETED', actorType: 'admin', competitionId, questionId: validated.id });
             io.to('admin').emit('QUESTIONS_UPDATED', await db.getAllQuestions());
             socket.emit('ACTION_RESULT', { success: true, action: 'DELETE_QUESTION' });
         } catch (error: any) {

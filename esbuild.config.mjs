@@ -1,8 +1,11 @@
 /**
  * Frontend Build Pipeline - esbuild
  *
- * Concatenates and minifies JS files per page.
- * Source files stay in public/js/, bundled output goes to public/dist/.
+ * Two build modes:
+ * - ES Module bundles: Entry points in public/js/src/ with import/export (player)
+ * - Concat bundles: Legacy files concatenated + minified (admin, jury, screen)
+ *
+ * Output goes to public/dist/.
  */
 
 import * as esbuild from 'esbuild';
@@ -11,36 +14,62 @@ import path from 'path';
 
 const PUBLIC_DIR = path.join(import.meta.dirname, 'public');
 const JS_DIR = path.join(PUBLIC_DIR, 'js');
+const SRC_DIR = path.join(JS_DIR, 'src');
 const DIST_DIR = path.join(PUBLIC_DIR, 'dist');
 
-// Page bundles: each entry is [outputName, ...sourceFiles]
-const bundles = [
+// ES Module entry points (proper import/export bundling)
+const moduleEntries = [
+    { entry: 'src/player.entry.js', outfile: 'player.bundle.js' },
+];
+
+// Legacy concat bundles (concatenate + minify)
+const concatBundles = [
     ['admin.bundle.js', 'common.js', 'admin.js'],
-    ['player.bundle.js', 'common.js', 'player.js'],
     ['jury.bundle.js', 'common.js', 'jury.js'],
     ['screen.bundle.js', 'common.js', 'sounds.js', 'screen.js'],
 ];
 
-// socket.io.min.js is already minified, just copy it
+// Vendor files (already minified, just copy)
 const vendorFiles = ['socket.io.min.js'];
 
+function formatSize(bytes) {
+    return (bytes / 1024).toFixed(1) + 'KB';
+}
+
 async function build() {
-    // Ensure dist directory exists
     if (!fs.existsSync(DIST_DIR)) {
         fs.mkdirSync(DIST_DIR, { recursive: true });
     }
 
     // Copy vendor files
     for (const file of vendorFiles) {
-        fs.copyFileSync(
-            path.join(JS_DIR, file),
-            path.join(DIST_DIR, file)
-        );
+        fs.copyFileSync(path.join(JS_DIR, file), path.join(DIST_DIR, file));
         console.log(`  Copied: ${file}`);
     }
 
-    // Build each page bundle by concatenating + minifying
-    for (const [outputName, ...sources] of bundles) {
+    // Build ES module bundles
+    for (const { entry, outfile } of moduleEntries) {
+        const entryPath = path.join(JS_DIR, entry);
+        const outPath = path.join(DIST_DIR, outfile);
+
+        await esbuild.build({
+            entryPoints: [entryPath],
+            outfile: outPath,
+            bundle: true,
+            minify: true,
+            sourcemap: true,
+            target: 'es2020',
+            format: 'iife',
+            external: ['socket.io-client'],
+        });
+
+        const originalSize = fs.statSync(entryPath).size;
+        const minifiedSize = fs.statSync(outPath).size;
+        console.log(`  Built (module): ${outfile} (${formatSize(originalSize)} → ${formatSize(minifiedSize)})`);
+    }
+
+    // Build legacy concat bundles
+    for (const [outputName, ...sources] of concatBundles) {
         const combined = sources
             .map(src => fs.readFileSync(path.join(JS_DIR, src), 'utf-8'))
             .join('\n;\n');
@@ -60,7 +89,7 @@ async function build() {
         const originalSize = Buffer.byteLength(combined);
         const minifiedSize = Buffer.byteLength(result.code);
         const savings = ((1 - minifiedSize / originalSize) * 100).toFixed(1);
-        console.log(`  Built: ${outputName} (${(originalSize / 1024).toFixed(1)}KB → ${(minifiedSize / 1024).toFixed(1)}KB, -${savings}%)`);
+        console.log(`  Built (concat): ${outputName} (${formatSize(originalSize)} → ${formatSize(minifiedSize)}, -${savings}%)`);
     }
 
     console.log('\nFrontend build complete!');

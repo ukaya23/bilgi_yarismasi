@@ -128,4 +128,22 @@ router.post('/competition/code/:id/reset', authenticateToken as any, requireRole
     }
 });
 
+// ==================== EVENT LOG API ====================
+
+router.get('/events', authenticateToken as any, requireRole('admin') as any, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+        const competitionId = req.query.competitionId ? parseInt(req.query.competitionId as string) : null;
+        const limit = Math.min(parseInt(req.query.limit as string) || 50, 200);
+
+        const events = competitionId
+            ? await db.getEventsByCompetition(competitionId, limit)
+            : await db.getRecentEvents(limit);
+
+        res.json(events);
+    } catch (error) {
+        log.error({ err: error }, 'Event log getirme hatasi');
+        res.status(500).json({ error: 'Sunucu hatası' });
+    }
+});
+
 export default router;

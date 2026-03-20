@@ -36,6 +36,13 @@ router.post('/login/admin', async (req: Request, res: Response) => {
 
         const tokens = generateTokenPair({ id: admin.id, username: admin.username, role: 'admin' as UserRole });
 
+        db.logEvent({
+            eventType: 'ADMIN_LOGIN',
+            actorType: 'admin',
+            actorId: admin.id,
+            actorName: admin.username,
+        });
+
         res.json({
             success: true,
             user: { id: admin.id, username: admin.username, role: 'admin' },
@@ -73,6 +80,14 @@ router.post('/validate-code', async (req: Request, res: Response) => {
             username: result.accessCode!.name,
             role: jwtRole,
             competitionId: result.accessCode!.competition_id
+        });
+
+        db.logEvent({
+            eventType: 'ACCESS_CODE_LOGIN',
+            actorType: jwtRole === 'player' ? 'player' : 'jury',
+            actorName: result.accessCode!.name,
+            competitionId: result.accessCode!.competition_id,
+            payload: { role: result.accessCode!.role, slotNumber: result.accessCode!.slot_number }
         });
 
         res.json({

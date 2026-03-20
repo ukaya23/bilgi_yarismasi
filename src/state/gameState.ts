@@ -160,6 +160,14 @@ export class GameState {
             });
         }
 
+        db.logEvent({
+            eventType: 'QUESTION_STARTED',
+            actorType: 'system',
+            competitionId: this.competitionId,
+            questionId: question.id,
+            payload: { content: question.content, type: question.type, points: question.points, duration: question.duration }
+        });
+
         this.gameTimer.start(
             question.duration,
             (timeRemaining: number) => {
@@ -240,6 +248,15 @@ export class GameState {
         if (result.success) {
             this.answeredPlayers.add(contestantId);
 
+            db.logEvent({
+                eventType: 'ANSWER_SUBMITTED',
+                actorType: 'player',
+                actorId: contestantId,
+                competitionId: this.competitionId,
+                questionId: this.currentQuestion.id,
+                payload: { timeRemaining: timeRemaining || this.gameTimer.timeRemaining }
+            });
+
             if (this.io) {
                 this.broadcast('PLAYER_STATUS_UPDATE', {
                     contestantId,
@@ -255,6 +272,14 @@ export class GameState {
         for (const grade of grades) {
             await db.gradeAnswer(grade.answerId, grade.isCorrect, grade.points);
         }
+
+        db.logEvent({
+            eventType: 'JURY_GRADED',
+            actorType: 'jury',
+            competitionId: this.competitionId,
+            questionId: this.currentQuestion?.id,
+            payload: { gradesCount: grades.length, correctCount: grades.filter(g => g.isCorrect).length }
+        });
     }
 
     async showResults(): Promise<void> {
@@ -304,6 +329,12 @@ export class GameState {
     }
 
     async resetGame(): Promise<void> {
+        db.logEvent({
+            eventType: 'GAME_RESET',
+            actorType: 'admin',
+            competitionId: this.competitionId,
+        });
+
         await this.goToIdle();
         await db.resetAllContestants(this.competitionId);
 

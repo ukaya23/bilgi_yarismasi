@@ -15,7 +15,8 @@ jest.mock('../database/postgres', () => ({
     getLeaderboard: jest.fn().mockResolvedValue([]),
     getSetting: jest.fn().mockResolvedValue('AUTO'),
     getRandomQuote: jest.fn().mockResolvedValue({ text: 'Test', author: 'Author' }),
-    resetAllContestants: jest.fn().mockResolvedValue()
+    resetAllContestants: jest.fn().mockResolvedValue(),
+    logEvent: jest.fn().mockResolvedValue()
 }));
 
 jest.mock('../src/state/gradingService', () => ({

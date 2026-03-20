@@ -14,8 +14,10 @@ import {
     AnswerRepository,
     CompetitionRepository,
     AuthRepository,
-    GameRepository
+    GameRepository,
+    EventLogRepository
 } from './repositories';
+import type { EventLogEntry } from './repositories/eventLogRepository';
 
 class PostgresDatabase {
     pool: Pool;
@@ -25,6 +27,7 @@ class PostgresDatabase {
     competitions: CompetitionRepository;
     auth: AuthRepository;
     game: GameRepository;
+    eventLog: EventLogRepository;
 
     constructor() {
         this.pool = new Pool({
@@ -44,6 +47,7 @@ class PostgresDatabase {
         this.competitions = new CompetitionRepository(this.pool);
         this.auth = new AuthRepository(this.pool);
         this.game = new GameRepository(this.pool);
+        this.eventLog = new EventLogRepository(this.pool);
     }
 
     async initialize(): Promise<void> {
@@ -128,6 +132,12 @@ class PostgresDatabase {
     getAllQuotes = () => this.game.getAllQuotes();
     getOrCreateSession = () => this.game.getOrCreateSession();
     updateSessionState = (state: Parameters<GameRepository['updateSessionState']>[0], questionId?: number | null) => this.game.updateSessionState(state, questionId);
+
+    // ==================== EVENT LOG İŞLEMLERİ ====================
+    logEvent = (entry: EventLogEntry) => this.eventLog.log(entry);
+    getEventsByCompetition = (competitionId: number, limit?: number, offset?: number) => this.eventLog.getByCompetition(competitionId, limit, offset);
+    getEventsByType = (eventType: string, limit?: number) => this.eventLog.getByType(eventType, limit);
+    getRecentEvents = (limit?: number) => this.eventLog.getRecent(limit);
 }
 
 const db = new PostgresDatabase();
