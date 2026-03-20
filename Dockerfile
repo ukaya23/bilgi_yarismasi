@@ -16,6 +16,9 @@ COPY . .
 # TypeScript derle
 RUN npx tsc
 
+# Frontend bundle (concat + minify)
+RUN node esbuild.config.mjs
+
 # devDependencies'i kaldır (image boyutunu küçült)
 RUN npm prune --omit=dev
 

@@ -1,1 +1,0 @@
-{"version":3,"file":"adminHandler.d.ts","sourceRoot":"","sources":["../../../src/handlers/adminHandler.ts"],"names":[],"mappings":"AAAA;;GAEG;AAEH,OAAO,KAAK,EAAE,MAAM,EAAE,MAAM,EAAE,MAAM,WAAW,CAAC;AAGhD,OAAO,KAAK,EAAE,SAAS,EAAE,MAAM,oBAAoB,CAAC;AAEpD,wBAAsB,qBAAqB,CAAC,EAAE,EAAE,MAAM,EAAE,MAAM,EAAE,MAAM,EAAE,SAAS,EAAE,SAAS,GAAG,OAAO,CAAC,IAAI,CAAC,CAqH3G"}

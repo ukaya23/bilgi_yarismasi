@@ -25,5 +25,9 @@ npm-debug.log*
 public/uploads/*
 !public/uploads/.gitkeep
 
+# Build output
+dist/
+public/dist/
+
 # Debug files
 debug_question.js

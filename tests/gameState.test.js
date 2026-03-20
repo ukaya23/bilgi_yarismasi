@@ -90,7 +90,8 @@ describe('GameState - State Machine', () => {
 
         expect(gs.state).toBe('QUESTION_ACTIVE');
         expect(db.updateSessionState).toHaveBeenCalledWith('QUESTION_ACTIVE', null);
-        expect(gs.io.emit).toHaveBeenCalledWith('GAME_STATE', expect.any(Object));
+        // broadcast() uses io.to('comp-1').emit(...)
+        expect(gs.io.to).toHaveBeenCalledWith('comp-1');
     });
 
     it('should allow valid transition chain IDLE -> QUESTION_ACTIVE -> LOCKED -> GRADING -> REVEAL -> IDLE', async () => {
@@ -135,10 +136,12 @@ describe('GameState - State Machine', () => {
         spy.mockRestore();
     });
 
-    it('should broadcast state change to all clients', async () => {
+    it('should broadcast state change to competition room', async () => {
         await gs.setState('QUESTION_ACTIVE');
 
-        expect(gs.io.emit).toHaveBeenCalledWith('GAME_STATE', expect.objectContaining({
+        expect(gs.io.to).toHaveBeenCalledWith('comp-1');
+        const roomEmit = gs.io.to.mock.results[0].value.emit;
+        expect(roomEmit).toHaveBeenCalledWith('GAME_STATE', expect.objectContaining({
             state: 'QUESTION_ACTIVE'
         }));
     });
@@ -185,20 +188,25 @@ describe('GameState - Start Question', () => {
         expect(gs.gameTimer.timer).not.toBe(firstTimer);
     });
 
-    it('should send question to players without correct_keys', async () => {
+    it('should send question to competition room without correct_keys', async () => {
+        const roomEmits = {};
+        gs.io.to = jest.fn((room) => {
+            const emitFn = jest.fn();
+            if (!roomEmits[room]) roomEmits[room] = [];
+            roomEmits[room].push(emitFn);
+            return { emit: emitFn };
+        });
+
         await gs.startQuestion(1);
 
-        const playerEmit = gs.io.to.mock.results.find(
-            (_, i) => gs.io.to.mock.calls[i][0] === 'player'
+        // NEW_QUESTION is broadcast to comp-1 (competition room)
+        expect(roomEmits['comp-1']).toBeDefined();
+        const compEmits = roomEmits['comp-1'];
+        const newQuestionEmit = compEmits.find(emitFn =>
+            emitFn.mock.calls.some(c => c[0] === 'NEW_QUESTION')
         );
-
-        expect(gs.io.to).toHaveBeenCalledWith('player');
-
-        // Find the NEW_QUESTION call to player
-        const playerCalls = gs.io.to.mock.calls;
-        const playerIdx = playerCalls.findIndex(c => c[0] === 'player');
-        const emitMock = gs.io.to.mock.results[playerIdx].value.emit;
-        const questionData = emitMock.mock.calls[0][1];
+        expect(newQuestionEmit).toBeDefined();
+        const questionData = newQuestionEmit.mock.calls.find(c => c[0] === 'NEW_QUESTION')[1];
 
         expect(questionData).not.toHaveProperty('correct_keys');
         expect(questionData).toHaveProperty('content');
@@ -283,9 +291,22 @@ describe('GameState - Submit Answer', () => {
     });
 
     it('should broadcast PLAYER_STATUS_UPDATE on successful answer', async () => {
+        const roomEmits = {};
+        gs.io.to = jest.fn((room) => {
+            const emitFn = jest.fn();
+            if (!roomEmits[room]) roomEmits[room] = [];
+            roomEmits[room].push(emitFn);
+            return { emit: emitFn };
+        });
+
         await gs.submitAnswer(1, 'Ankara', 25);
 
-        expect(gs.io.emit).toHaveBeenCalledWith('PLAYER_STATUS_UPDATE', {
+        expect(roomEmits['comp-1']).toBeDefined();
+        const statusEmit = roomEmits['comp-1'].find(emitFn =>
+            emitFn.mock.calls.some(c => c[0] === 'PLAYER_STATUS_UPDATE')
+        );
+        expect(statusEmit).toBeDefined();
+        expect(statusEmit).toHaveBeenCalledWith('PLAYER_STATUS_UPDATE', {
             contestantId: 1,
             status: 'answered'
         });
@@ -325,11 +346,23 @@ describe('GameState - goToIdle & resetGame', () => {
     });
 
     it('should broadcast GAME_RESET on resetGame', async () => {
+        const roomEmits = {};
+        gs.io.to = jest.fn((room) => {
+            const emitFn = jest.fn();
+            if (!roomEmits[room]) roomEmits[room] = [];
+            roomEmits[room].push(emitFn);
+            return { emit: emitFn };
+        });
+
         await gs.resetGame();
 
         expect(gs.state).toBe('IDLE');
-        expect(db.resetAllContestants).toHaveBeenCalledWith(1); // competitionId
-        expect(gs.io.emit).toHaveBeenCalledWith('GAME_RESET');
+        expect(db.resetAllContestants).toHaveBeenCalledWith(1);
+        expect(roomEmits['comp-1']).toBeDefined();
+        const resetEmit = roomEmits['comp-1'].find(emitFn =>
+            emitFn.mock.calls.some(c => c[0] === 'GAME_RESET')
+        );
+        expect(resetEmit).toBeDefined();
     });
 });
 
