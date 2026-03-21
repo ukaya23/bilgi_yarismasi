@@ -130,16 +130,8 @@ function setupEventListeners() {
     // Soru tipi değişimi
     document.getElementById('questionType').addEventListener('change', (e) => {
         const type = e.target.value;
-        const optsGroup = document.getElementById('optionsGroup');
-        const mcOptsGroup = document.getElementById('mcOptionsGroup');
-
-        if (type === 'MULTIPLE_CHOICE') {
-            optsGroup.style.display = 'block';
-            mcOptsGroup.style.display = 'block';
-        } else {
-            optsGroup.style.display = 'none';
-            mcOptsGroup.style.display = 'none';
-        }
+        document.getElementById('optionsContainer').style.display = type === 'MULTIPLE_CHOICE' ? 'block' : 'none';
+        document.getElementById('openEndedAnswerContainer').style.display = type === 'OPEN_ENDED' ? 'block' : 'none';
     });
 
     // Sıralama Kürsüsü Göster
@@ -1493,7 +1485,7 @@ async function handleImageSelect(e) {
 
     try {
         const formData = new FormData();
-        formData.append('image', file);
+        formData.append('file', file);
 
         const response = await fetch('/api/upload', {
             method: 'POST',

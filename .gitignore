@@ -29,5 +29,10 @@ public/uploads/*
 dist/
 public/dist/
 
+# Playwright
+test-results/
+playwright-report/
+e2e/.auth-state.json
+
 # Debug files
 debug_question.js

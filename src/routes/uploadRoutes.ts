@@ -27,7 +27,7 @@ const ALLOWED_TYPES: Record<string, string> = {
 
 const storage = multer.diskStorage({
     destination: (_req, _file, cb) => {
-        const uploadsDir = path.join(__dirname, '..', '..', 'public', 'uploads');
+        const uploadsDir = path.join(__dirname, '..', '..', '..', 'public', 'uploads');
         if (!fs.existsSync(uploadsDir)) {
             fs.mkdirSync(uploadsDir, { recursive: true });
         }
@@ -53,7 +53,7 @@ const upload = multer({
 });
 
 // Upload file
-router.post('/', authenticateToken as any, requireRole('admin') as any, upload.single('image'), async (req: Request, res: Response) => {
+router.post('/', authenticateToken as any, requireRole('admin') as any, upload.single('file'), async (req: Request, res: Response) => {
     try {
         if (!req.file) {
             res.status(400).json({ error: 'Dosya yüklenmedi' });
@@ -110,7 +110,7 @@ router.delete('/:filename', authenticateToken as any, requireRole('admin') as an
             return;
         }
 
-        const uploadsDir = path.join(__dirname, '..', '..', 'public', 'uploads');
+        const uploadsDir = path.join(__dirname, '..', '..', '..', 'public', 'uploads');
         const filePath = path.join(uploadsDir, sanitized);
 
         if (!path.resolve(filePath).startsWith(path.resolve(uploadsDir))) {
