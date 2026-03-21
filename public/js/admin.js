@@ -531,6 +531,105 @@ function downloadTemplate(format) {
     });
 }
 
+// ==================== MEDIA GALLERY ====================
+
+function openGalleryModal() {
+    document.getElementById('galleryModal').classList.add('active');
+    loadGallery();
+}
+
+function closeGalleryModal() {
+    document.getElementById('galleryModal').classList.remove('active');
+}
+
+function filterGallery(btn, type) {
+    document.querySelectorAll('.gallery-filter').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    loadGallery(type);
+}
+
+async function loadGallery(type) {
+    const grid = document.getElementById('galleryGrid');
+    grid.innerHTML = '<div class="empty-state"><p>Yukleniyor...</p></div>';
+
+    try {
+        const url = '/api/upload/gallery' + (type ? '?type=' + type : '');
+        const resp = await fetch(url, {
+            headers: { 'Authorization': 'Bearer ' + adminToken }
+        });
+        const data = await resp.json();
+
+        if (!data.items || data.items.length === 0) {
+            grid.innerHTML = '<div class="empty-state"><p>Henuz medya yok</p></div>';
+            return;
+        }
+
+        grid.innerHTML = data.items.map(item => `
+            <div class="gallery-item" onclick="selectFromGallery('${item.url}')" title="${item.original_name || item.filename}">
+                ${renderGalleryThumb(item)}
+                <div class="gallery-item-info">
+                    <span class="gallery-item-name">${item.original_name || item.filename}</span>
+                    <span class="gallery-item-type badge badge-${item.media_type === 'image' ? 'success' : item.media_type === 'audio' ? 'warning' : 'info'}">${item.media_type}</span>
+                </div>
+            </div>
+        `).join('');
+    } catch {
+        grid.innerHTML = '<div class="empty-state"><p>Galeri yuklenemedi</p></div>';
+    }
+}
+
+function renderGalleryThumb(item) {
+    if (item.media_type === 'image') {
+        return '<img src="' + item.url + '" alt="' + (item.original_name || '') + '" loading="lazy">';
+    } else if (item.media_type === 'audio') {
+        return '<div class="gallery-thumb-icon">🎵</div>';
+    } else {
+        return '<div class="gallery-thumb-icon">🎬</div>';
+    }
+}
+
+function selectFromGallery(url) {
+    document.getElementById('questionMediaUrl').value = url;
+    showMediaPreview(url);
+    closeGalleryModal();
+}
+
+function showMediaPreview(url) {
+    const preview = document.getElementById('imagePreview');
+    const previewImg = document.getElementById('previewImage');
+    const uploadArea = document.getElementById('imageUploadArea');
+
+    // Determine media type from extension
+    const ext = url.split('.').pop().toLowerCase();
+    const audioExts = ['mp3', 'wav', 'ogg', 'mpeg'];
+    const videoExts = ['mp4', 'webm'];
+
+    // Clear any previous audio/video elements
+    preview.querySelectorAll('audio, video').forEach(el => el.remove());
+
+    if (audioExts.includes(ext)) {
+        previewImg.style.display = 'none';
+        const audio = document.createElement('audio');
+        audio.controls = true;
+        audio.src = url;
+        audio.className = 'media-preview-player';
+        preview.insertBefore(audio, preview.firstChild);
+    } else if (videoExts.includes(ext)) {
+        previewImg.style.display = 'none';
+        const video = document.createElement('video');
+        video.controls = true;
+        video.src = url;
+        video.className = 'media-preview-player';
+        preview.insertBefore(video, preview.firstChild);
+    } else {
+        previewImg.style.display = '';
+        previewImg.src = url;
+    }
+
+    preview.classList.remove('hidden');
+    uploadArea.classList.add('hidden');
+}
+
 // ==================== UI UPDATES ====================
 
 function updateGameStateUI(state) {

@@ -15,7 +15,8 @@ import {
     CompetitionRepository,
     AuthRepository,
     GameRepository,
-    EventLogRepository
+    EventLogRepository,
+    MediaRepository
 } from './repositories';
 import type { EventLogEntry } from './repositories/eventLogRepository';
 
@@ -28,6 +29,7 @@ class PostgresDatabase {
     auth: AuthRepository;
     game: GameRepository;
     eventLog: EventLogRepository;
+    media: MediaRepository;
 
     constructor() {
         this.pool = new Pool({
@@ -48,6 +50,7 @@ class PostgresDatabase {
         this.auth = new AuthRepository(this.pool);
         this.game = new GameRepository(this.pool);
         this.eventLog = new EventLogRepository(this.pool);
+        this.media = new MediaRepository(this.pool);
     }
 
     async initialize(): Promise<void> {
@@ -185,6 +188,13 @@ class PostgresDatabase {
     getEventsByCompetition = (competitionId: number, limit?: number, offset?: number) => this.eventLog.getByCompetition(competitionId, limit, offset);
     getEventsByType = (eventType: string, limit?: number) => this.eventLog.getByType(eventType, limit);
     getRecentEvents = (limit?: number) => this.eventLog.getRecent(limit);
+
+    // ==================== MEDYA İŞLEMLERİ ====================
+    addMedia = (entry: Parameters<MediaRepository['addMedia']>[0]) => this.media.addMedia(entry);
+    getAllMedia = (mediaType?: string) => this.media.getAll(mediaType);
+    getMediaByFilename = (filename: string) => this.media.getByFilename(filename);
+    deleteMedia = (filename: string) => this.media.deleteByFilename(filename);
+    getMediaUsageCount = (filename: string) => this.media.getUsageCount(filename);
 }
 
 const db = new PostgresDatabase();

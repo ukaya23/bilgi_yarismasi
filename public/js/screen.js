@@ -583,17 +583,17 @@ function showQuestionScreen(data) {
     document.getElementById('pointsValue').textContent = data.points;
     if (data.index) updateQuestionCounter(data.index, data.total);
 
-    // Resim vs Quote
+    // Media vs Quote
     const mediaContainer = document.getElementById('screenMedia');
     const quoteContainer = document.getElementById('quoteContainer');
-    const imageEl = document.getElementById('screenQuestionImage');
 
     if (data.media_url) {
-        imageEl.src = data.media_url;
+        renderScreenMedia(mediaContainer, data.media_url);
         mediaContainer.classList.remove('hidden');
         mediaContainer.style.display = 'flex';
         if (quoteContainer) quoteContainer.classList.add('hidden');
     } else {
+        clearScreenMedia(mediaContainer);
         mediaContainer.classList.add('hidden');
         mediaContainer.style.display = 'none';
         if (quoteContainer) {
@@ -603,6 +603,44 @@ function showQuestionScreen(data) {
     }
 
     updateContestantsGrid();
+}
+
+function renderScreenMedia(container, url) {
+    clearScreenMedia(container);
+    const ext = url.split('.').pop().toLowerCase();
+    const audioExts = ['mp3', 'wav', 'ogg', 'mpeg'];
+    const videoExts = ['mp4', 'webm'];
+
+    if (audioExts.includes(ext)) {
+        const audio = document.createElement('audio');
+        audio.controls = true;
+        audio.autoplay = true;
+        audio.src = url;
+        audio.className = 'screen-media-player';
+        container.appendChild(audio);
+    } else if (videoExts.includes(ext)) {
+        const video = document.createElement('video');
+        video.controls = true;
+        video.autoplay = true;
+        video.src = url;
+        video.className = 'screen-media-player';
+        container.appendChild(video);
+    } else {
+        const img = document.getElementById('screenQuestionImage');
+        if (img) {
+            img.src = url;
+            img.style.display = '';
+        }
+    }
+}
+
+function clearScreenMedia(container) {
+    container.querySelectorAll('audio, video').forEach(el => {
+        el.pause();
+        el.remove();
+    });
+    const img = document.getElementById('screenQuestionImage');
+    if (img) { img.src = ''; img.style.display = 'none'; }
 }
 
 function showQuote(quote) {

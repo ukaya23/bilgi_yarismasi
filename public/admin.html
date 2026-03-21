@@ -425,13 +425,14 @@
                                     title="Resmi Kaldır">✕</button>
                             </div>
                             <div class="image-upload-area" id="imageUploadArea">
-                                <input type="file" id="imageInput" accept="image/jpeg,image/png,image/gif,image/webp"
+                                <input type="file" id="imageInput" accept="image/*,audio/*,video/mp4,video/webm"
                                     hidden>
                                 <div class="upload-placeholder" onclick="document.getElementById('imageInput').click()">
-                                    <span class="upload-icon">📷</span>
-                                    <span class="upload-text">Resim yüklemek için tıklayın</span>
-                                    <span class="upload-hint">JPEG, PNG, GIF veya WEBP (max 10MB)</span>
+                                    <span class="upload-icon">📁</span>
+                                    <span class="upload-text">Medya yuklemek icin tiklayin</span>
+                                    <span class="upload-hint">Resim, Ses veya Video (max 50MB)</span>
                                 </div>
+                                <button type="button" class="btn btn-secondary btn-sm mt-1" onclick="openGalleryModal()">📂 Galeriden Sec</button>
                                 <div class="upload-progress hidden" id="uploadProgress">
                                     <div class="spinner"></div>
                                     <span>Yükleniyor...</span>
@@ -489,6 +490,27 @@
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closeCompetitionModal()">İptal</button>
                 <button class="btn btn-success" onclick="createCompetition()">Oluştur</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Gallery Modal -->
+    <div class="modal" id="galleryModal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3>Medya Galerisi</h3>
+                <button type="button" class="btn btn-icon" onclick="closeGalleryModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="gallery-filters">
+                    <button type="button" class="btn btn-sm btn-secondary gallery-filter active" data-filter="" onclick="filterGallery(this, '')">Tumunu</button>
+                    <button type="button" class="btn btn-sm btn-secondary gallery-filter" data-filter="image" onclick="filterGallery(this, 'image')">Resimler</button>
+                    <button type="button" class="btn btn-sm btn-secondary gallery-filter" data-filter="audio" onclick="filterGallery(this, 'audio')">Sesler</button>
+                    <button type="button" class="btn btn-sm btn-secondary gallery-filter" data-filter="video" onclick="filterGallery(this, 'video')">Videolar</button>
+                </div>
+                <div class="gallery-grid" id="galleryGrid">
+                    <div class="empty-state"><p>Yukleniyor...</p></div>
+                </div>
             </div>
         </div>
     </div>
