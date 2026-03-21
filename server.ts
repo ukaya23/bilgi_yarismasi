@@ -70,6 +70,7 @@ import competitionRoutes from './src/routes/competitionRoutes';
 import uploadRoutes from './src/routes/uploadRoutes';
 import settingsRoutes from './src/routes/settingsRoutes';
 import gameRoutes from './src/routes/gameRoutes';
+import questionImportExportRoutes from './src/routes/questionImportExportRoutes';
 
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/validate-code', authLimiter);
@@ -79,6 +80,7 @@ app.use('/api/competitions', competitionRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api', gameRoutes);
+app.use('/api/questions', questionImportExportRoutes);
 
 // ==================== SOCKET.IO ====================
 

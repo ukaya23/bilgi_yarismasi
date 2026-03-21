@@ -186,9 +186,21 @@
             <section id="questions-section" class="section">
                 <header class="section-header">
                     <h1>Soru Yönetimi</h1>
-                    <button class="btn btn-primary" id="addQuestionBtn">
-                        ➕ Yeni Soru
-                    </button>
+                    <div class="header-actions">
+                        <button class="btn btn-secondary" onclick="downloadTemplate()">
+                            📄 Sablon Indir
+                        </button>
+                        <button class="btn btn-secondary" onclick="document.getElementById('importFileInput').click()">
+                            📥 Ice Aktar
+                        </button>
+                        <button class="btn btn-secondary" onclick="exportQuestions()">
+                            📤 Disa Aktar
+                        </button>
+                        <button class="btn btn-primary" id="addQuestionBtn">
+                            ➕ Yeni Soru
+                        </button>
+                        <input type="file" id="importFileInput" accept=".xlsx,.xls,.csv" hidden onchange="handleImportFile(this)">
+                    </div>
                 </header>
 
                 <div class="card">
@@ -477,6 +489,28 @@
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closeCompetitionModal()">İptal</button>
                 <button class="btn btn-success" onclick="createCompetition()">Oluştur</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import Results Modal -->
+    <div class="modal" id="importResultsModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Ice Aktarma Sonucu</h3>
+                <button type="button" class="btn btn-icon" onclick="document.getElementById('importResultsModal').classList.remove('active')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="importSummary"></div>
+                <div class="table-container mt-2 import-results-table">
+                    <table>
+                        <thead><tr><th>Satir</th><th>Durum</th><th>Detay</th></tr></thead>
+                        <tbody id="importResultsBody"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" onclick="document.getElementById('importResultsModal').classList.remove('active')">Tamam</button>
             </div>
         </div>
     </div>

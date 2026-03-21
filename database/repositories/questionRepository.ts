@@ -69,4 +69,36 @@ export class QuestionRepository {
         );
         return result.rowCount;
     }
+
+    async addQuestionsBulk(questions: Partial<import('../../src/types').Question>[]): Promise<number[]> {
+        const client = await this.pool.connect();
+        try {
+            await client.query('BEGIN');
+            const ids: number[] = [];
+            for (const q of questions) {
+                const result = await client.query(`
+                    INSERT INTO questions (content, media_url, type, options, correct_keys, points, duration, category)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                    RETURNING id
+                `, [
+                    q.content,
+                    q.media_url || null,
+                    q.type || 'OPEN_ENDED',
+                    q.options ? JSON.stringify(q.options) : null,
+                    q.correct_keys ? JSON.stringify(q.correct_keys) : null,
+                    q.points || 10,
+                    q.duration || 30,
+                    q.category || null
+                ]);
+                ids.push(result.rows[0].id);
+            }
+            await client.query('COMMIT');
+            return ids;
+        } catch (err) {
+            await client.query('ROLLBACK');
+            throw err;
+        } finally {
+            client.release();
+        }
+    }
 }

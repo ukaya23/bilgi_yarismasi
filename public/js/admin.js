@@ -433,6 +433,104 @@ function sendFullscreenImage() {
     showToast('Ekrana gonderildi', 'success');
 }
 
+// ==================== IMPORT / EXPORT ====================
+
+async function handleImportFile(input) {
+    const file = input.files[0];
+    if (!file) return;
+    input.value = ''; // reset for re-upload
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    showToast('Dosya yukleniyor...', 'info');
+
+    try {
+        const resp = await fetch('/api/questions/import', {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + adminToken },
+            body: formData
+        });
+        const data = await resp.json();
+
+        if (!resp.ok) {
+            showToast(data.error || 'Ice aktarma hatasi', 'error');
+            return;
+        }
+
+        showImportResults(data);
+
+        // Refresh questions list
+        socketManager.emit('GET_QUESTIONS');
+    } catch (err) {
+        showToast('Ice aktarma sirasinda hata olustu', 'error');
+    }
+}
+
+function showImportResults(data) {
+    const summary = document.getElementById('importSummary');
+    summary.innerHTML = `
+        <div class="grid grid-3" style="text-align:center">
+            <div><strong>${data.total}</strong><br><small>Toplam Satir</small></div>
+            <div style="color:var(--success)"><strong>${data.imported}</strong><br><small>Basarili</small></div>
+            <div style="color:var(--danger)"><strong>${data.errors}</strong><br><small>Hatali</small></div>
+        </div>
+    `;
+
+    const tbody = document.getElementById('importResultsBody');
+    tbody.innerHTML = data.results.map(r => `
+        <tr>
+            <td>${r.row}</td>
+            <td><span class="badge ${r.status === 'success' ? 'badge-success' : 'badge-danger'}">${r.status === 'success' ? 'Basarili' : 'Hata'}</span></td>
+            <td>${r.status === 'success' ? 'ID: ' + r.id : r.message}</td>
+        </tr>
+    `).join('');
+
+    document.getElementById('importResultsModal').classList.add('active');
+}
+
+function exportQuestions(format) {
+    format = format || 'xlsx';
+    const url = '/api/questions/export?format=' + format;
+    const a = document.createElement('a');
+    // Use fetch to include auth header, then download blob
+    fetch(url, {
+        headers: { 'Authorization': 'Bearer ' + adminToken }
+    }).then(r => {
+        if (!r.ok) throw new Error('Export hatasi');
+        return r.blob();
+    }).then(blob => {
+        const blobUrl = URL.createObjectURL(blob);
+        a.href = blobUrl;
+        a.download = format === 'csv' ? 'sorular.csv' : 'sorular.xlsx';
+        a.click();
+        URL.revokeObjectURL(blobUrl);
+        showToast('Sorular disa aktarildi', 'success');
+    }).catch(() => {
+        showToast('Disa aktarma hatasi', 'error');
+    });
+}
+
+function downloadTemplate(format) {
+    format = format || 'xlsx';
+    const url = '/api/questions/template?format=' + format;
+    fetch(url, {
+        headers: { 'Authorization': 'Bearer ' + adminToken }
+    }).then(r => {
+        if (!r.ok) throw new Error('Sablon hatasi');
+        return r.blob();
+    }).then(blob => {
+        const blobUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = format === 'csv' ? 'soru_sablonu.csv' : 'soru_sablonu.xlsx';
+        a.click();
+        URL.revokeObjectURL(blobUrl);
+    }).catch(() => {
+        showToast('Sablon indirme hatasi', 'error');
+    });
+}
+
 // ==================== UI UPDATES ====================
 
 function updateGameStateUI(state) {

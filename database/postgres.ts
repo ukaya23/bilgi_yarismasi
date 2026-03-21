@@ -120,6 +120,7 @@ class PostgresDatabase {
     addQuestion = (question: Parameters<QuestionRepository['addQuestion']>[0]) => this.questions.addQuestion(question);
     updateQuestion = (id: number, question: Parameters<QuestionRepository['updateQuestion']>[1]) => this.questions.updateQuestion(id, question);
     deleteQuestion = (id: number) => this.questions.deleteQuestion(id);
+    addQuestionsBulk = (questions: Parameters<QuestionRepository['addQuestionsBulk']>[0]) => this.questions.addQuestionsBulk(questions);
 
     // ==================== YARIŞMACI İŞLEMLERİ ====================
     getAllContestants = (competitionId?: number | null) => this.contestants.getAllContestants(competitionId);

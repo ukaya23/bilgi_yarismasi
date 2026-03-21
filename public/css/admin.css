@@ -835,3 +835,16 @@ tbody tr {
 .director-icon {
     font-size: 2rem;
 }
+
+/* Import/Export */
+.header-actions {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.import-results-table {
+    max-height: 300px;
+    overflow-y: auto;
+}

@@ -33,6 +33,7 @@
     "pino": "^10.3.1",
     "socket.io": "^4.7.4",
     "uuid": "^9.0.0",
+    "xlsx": "^0.18.5",
     "zod": "^4.3.6"
   },
   "devDependencies": {
