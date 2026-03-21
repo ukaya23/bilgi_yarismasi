@@ -73,7 +73,7 @@ class PostgresDatabase {
     private async runMigrations(): Promise<void> {
         const fs = await import('fs');
         const path = await import('path');
-        const migrationsDir = path.join(__dirname, '..', 'database', 'migrations');
+        const migrationsDir = path.join(__dirname, '..', '..', 'database', 'migrations');
 
         // Create migrations tracking table
         await this.pool.query(`
