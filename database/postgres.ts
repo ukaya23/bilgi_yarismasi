@@ -180,6 +180,7 @@ class PostgresDatabase {
 
     // ==================== EVENT LOG İŞLEMLERİ ====================
     logEvent = (entry: EventLogEntry) => this.eventLog.log(entry);
+    logAndReturnEvent = (entry: EventLogEntry) => this.eventLog.logAndReturn(entry);
     getEventsByCompetition = (competitionId: number, limit?: number, offset?: number) => this.eventLog.getByCompetition(competitionId, limit, offset);
     getEventsByType = (eventType: string, limit?: number) => this.eventLog.getByType(eventType, limit);
     getRecentEvents = (limit?: number) => this.eventLog.getRecent(limit);

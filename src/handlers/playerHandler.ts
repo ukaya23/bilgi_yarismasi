@@ -77,6 +77,16 @@ export function registerPlayerHandlers(io: Server, socket: PlayerSocket, gameSta
             io.to('admin').emit('CONTESTANTS_UPDATED', contestants);
             io.to('screen').emit('CONTESTANTS_UPDATED', contestants);
 
+            // Broadcast activity event
+            const event = await db.logAndReturnEvent({
+                eventType: 'PLAYER_CONNECTED',
+                actorType: 'player',
+                actorId: contestantId,
+                actorName: name,
+                competitionId,
+            });
+            if (event) io.to('admin').emit('ACTIVITY_EVENT', event);
+
             log.info({ name, tableNo, contestantId }, 'Player giris basarili');
         } catch (error: any) {
             log.error({ err: error }, 'Player login hatasi');
@@ -129,6 +139,15 @@ export function registerPlayerHandlers(io: Server, socket: PlayerSocket, gameSta
             const contestants = await db.getAllContestants(gameState.competitionId);
             io.to('admin').emit('CONTESTANTS_UPDATED', contestants);
             io.to('screen').emit('CONTESTANTS_UPDATED', contestants);
+
+            const event = await db.logAndReturnEvent({
+                eventType: 'PLAYER_DISCONNECTED',
+                actorType: 'player',
+                actorId: contestantId,
+                competitionId: gameState.competitionId,
+            });
+            if (event) io.to('admin').emit('ACTIVITY_EVENT', event);
+
             log.info({ contestantId }, 'Player ayrildi');
         }
     });

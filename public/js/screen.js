@@ -409,10 +409,102 @@ function setupSocketEvents() {
 
     socketManager.on('GAME_RESET', () => {
         showScreen('idleScreen');
-        // Clear podium if it was active
         const podiumContainer = document.getElementById('podiumContainer');
-        if (podiumContainer) podiumContainer.innerHTML = ''; // or reset logic
+        if (podiumContainer) podiumContainer.innerHTML = '';
     });
+
+    // Director mode scenes
+    socketManager.on('DIRECTOR_SCENE', (data) => {
+        handleDirectorScene(data);
+    });
+}
+
+// ==================== DIRECTOR MODE ====================
+
+function handleDirectorScene(data) {
+    switch (data.scene) {
+        case 'idle':
+            showScreen('idleScreen');
+            break;
+        case 'leaderboard':
+            showDirectorLeaderboard(data.leaderboard);
+            break;
+        case 'fullscreen_image':
+            showDirectorImage(data.media_url, data.title);
+            break;
+        case 'custom_text':
+            showDirectorText(data.text, data.subtitle);
+            break;
+    }
+}
+
+function showDirectorLeaderboard(leaderboard) {
+    showScreen('directorScreen');
+    const container = document.getElementById('directorLeaderboardContainer');
+    const imageC = document.getElementById('directorImageContainer');
+    const textC = document.getElementById('directorTextContainer');
+
+    if (imageC) imageC.classList.add('hidden');
+    if (textC) textC.classList.add('hidden');
+    if (container) container.classList.remove('hidden');
+
+    const list = document.getElementById('directorLeaderboardList');
+    if (!list) return;
+    list.innerHTML = '';
+
+    const ranks = ['🥇', '🥈', '🥉'];
+    (leaderboard || []).forEach((entry, i) => {
+        const row = document.createElement('div');
+        row.className = 'director-lb-row';
+        row.style.animationDelay = (i * 0.1) + 's';
+
+        const rank = document.createElement('span');
+        rank.className = 'director-lb-rank';
+        rank.textContent = i < 3 ? ranks[i] : (i + 1).toString();
+
+        const name = document.createElement('span');
+        name.className = 'director-lb-name';
+        name.textContent = entry.name;
+
+        const score = document.createElement('span');
+        score.className = 'director-lb-score';
+        score.textContent = entry.total_score;
+
+        row.append(rank, name, score);
+        list.appendChild(row);
+    });
+}
+
+function showDirectorImage(url, title) {
+    showScreen('directorScreen');
+    const container = document.getElementById('directorImageContainer');
+    const textC = document.getElementById('directorTextContainer');
+    const lbC = document.getElementById('directorLeaderboardContainer');
+
+    if (textC) textC.classList.add('hidden');
+    if (lbC) lbC.classList.add('hidden');
+    if (container) container.classList.remove('hidden');
+
+    const img = document.getElementById('directorImage');
+    if (img) img.src = url;
+    const titleEl = document.getElementById('directorImageTitle');
+    if (titleEl) titleEl.textContent = title || '';
+}
+
+function showDirectorText(text, subtitle) {
+    showScreen('directorScreen');
+    const container = document.getElementById('directorTextContainer');
+    const imageC = document.getElementById('directorImageContainer');
+    const lbC = document.getElementById('directorLeaderboardContainer');
+
+    if (imageC) imageC.classList.add('hidden');
+    if (lbC) lbC.classList.add('hidden');
+    if (container) container.classList.remove('hidden');
+
+    const main = document.getElementById('directorMainText');
+    if (main) main.textContent = text;
+    const sub = document.getElementById('directorSubtitleText');
+    if (sub) sub.textContent = subtitle || '';
 }
 
 function updateQuestionCounter(current, total) {

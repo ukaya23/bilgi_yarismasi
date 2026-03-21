@@ -84,3 +84,15 @@ export type PlayerSubmitAnswer = z.infer<typeof PlayerSubmitAnswerSchema>;
 export type JuryApproveGroup = z.infer<typeof JuryApproveGroupSchema>;
 export type JuryManualScore = z.infer<typeof JuryManualScoreSchema>;
 export type JuryRequestAnswers = z.infer<typeof JuryRequestAnswersSchema>;
+
+// ==================== DIRECTOR EVENT'LERİ ====================
+
+export const DirectorShowImageSchema = z.object({
+    media_url: z.string().max(500),
+    title: z.string().max(200).optional().default('')
+});
+
+export const DirectorShowTextSchema = z.object({
+    text: z.string().min(1).max(1000),
+    subtitle: z.string().max(500).optional().default('')
+});

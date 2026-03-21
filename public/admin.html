@@ -31,6 +31,12 @@
                 <a href="#" class="nav-item" data-section="contestants">
                     <span>👥</span> Yarışmacılar
                 </a>
+                <a href="#" class="nav-item" data-section="director">
+                    <span>🎬</span> Yonetmen Modu
+                </a>
+                <a href="#" class="nav-item" data-section="activity">
+                    <span>📋</span> Aktivite
+                </a>
                 <a href="#" class="nav-item" data-section="settings">
                     <span>⚙️</span> Ayarlar
                 </a>
@@ -166,6 +172,14 @@
                         </table>
                     </div>
                 </div>
+
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h3 class="card-title">📋 Son Aktiviteler</h3>
+                    </div>
+                    <div class="activity-feed activity-feed-mini" id="dashboardActivityFeed">
+                    </div>
+                </div>
             </section>
 
             <!-- Questions Section -->
@@ -237,6 +251,67 @@
                         <div class="empty-state">
                             <p>Yükleniyor...</p>
                         </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Director Section -->
+            <section id="director-section" class="section">
+                <header class="section-header">
+                    <h1>Yonetmen Modu</h1>
+                    <span class="badge badge-warning">Ekran Kontrolu</span>
+                </header>
+
+                <div class="card">
+                    <h3>Sahne Secimi</h3>
+                    <div class="director-grid">
+                        <button type="button" class="director-btn" onclick="directorScene('idle')">
+                            <span class="director-icon">⏸️</span>
+                            <span>Bekleme Ekrani</span>
+                        </button>
+                        <button type="button" class="director-btn" onclick="directorScene('leaderboard')">
+                            <span class="director-icon">🏆</span>
+                            <span>Siralama Tablosu</span>
+                        </button>
+                        <button type="button" class="director-btn" onclick="directorScene('podium')">
+                            <span class="director-icon">🥇</span>
+                            <span>Kursu Goster</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="card mt-3">
+                    <h3>Ozel Metin Goster</h3>
+                    <div class="form-group">
+                        <input type="text" class="form-control" id="directorText" placeholder="Ana metin...">
+                    </div>
+                    <div class="form-group">
+                        <input type="text" class="form-control" id="directorSubtitle" placeholder="Alt metin (opsiyonel)">
+                    </div>
+                    <button type="button" class="btn btn-primary" onclick="sendCustomText()">Ekranda Goster</button>
+                </div>
+
+                <div class="card mt-3">
+                    <h3>Gorsel Goster</h3>
+                    <div class="form-group">
+                        <input type="text" class="form-control" id="directorImageUrl" placeholder="Gorsel URL (orn: /uploads/resim.jpg)">
+                    </div>
+                    <div class="form-group">
+                        <input type="text" class="form-control" id="directorImageTitle" placeholder="Baslik (opsiyonel)">
+                    </div>
+                    <button type="button" class="btn btn-primary" onclick="sendFullscreenImage()">Ekranda Goster</button>
+                </div>
+            </section>
+
+            <!-- Activity Section -->
+            <section id="activity-section" class="section">
+                <header class="section-header">
+                    <h1>Canli Aktivite Akisi</h1>
+                </header>
+
+                <div class="card">
+                    <div class="activity-feed" id="activityFeed">
+                        <div class="activity-empty">Henuz aktivite yok</div>
                     </div>
                 </div>
             </section>

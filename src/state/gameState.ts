@@ -72,6 +72,12 @@ export class GameState {
         if (this.io) this.io.to(`comp-${this.competitionId}`).emit(event, data);
     }
 
+    /** Log event and broadcast to admin activity feed */
+    private async logActivity(entry: Parameters<typeof db.logAndReturnEvent>[0]): Promise<void> {
+        const event = await db.logAndReturnEvent(entry);
+        if (event && this.io) this.io.to('admin').emit('ACTIVITY_EVENT', event);
+    }
+
     get timeRemaining(): number {
         return this.gameTimer.timeRemaining;
     }
@@ -166,7 +172,7 @@ export class GameState {
             });
         }
 
-        db.logEvent({
+        this.logActivity({
             eventType: 'QUESTION_STARTED',
             actorType: 'system',
             competitionId: this.competitionId,
@@ -254,7 +260,7 @@ export class GameState {
         if (result.success) {
             this.answeredPlayers.add(contestantId);
 
-            db.logEvent({
+            this.logActivity({
                 eventType: 'ANSWER_SUBMITTED',
                 actorType: 'player',
                 actorId: contestantId,
@@ -279,7 +285,7 @@ export class GameState {
             await db.gradeAnswer(grade.answerId, grade.isCorrect, grade.points);
         }
 
-        db.logEvent({
+        this.logActivity({
             eventType: 'JURY_GRADED',
             actorType: 'jury',
             competitionId: this.competitionId,
@@ -338,7 +344,7 @@ export class GameState {
     }
 
     async resetGame(): Promise<void> {
-        db.logEvent({
+        this.logActivity({
             eventType: 'GAME_RESET',
             actorType: 'admin',
             competitionId: this.competitionId,

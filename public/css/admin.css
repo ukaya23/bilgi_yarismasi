@@ -731,3 +731,107 @@ tbody tr {
     color: var(--primary-light);
     background: rgba(99, 102, 241, 0.05);
 }
+
+/* ==================== ACTIVITY FEED ==================== */
+
+.activity-feed {
+    max-height: 600px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.activity-feed-mini {
+    max-height: 280px;
+}
+
+.activity-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-left: 3px solid #6b7280;
+    background: var(--bg-secondary);
+    border-radius: 0 4px 4px 0;
+    font-size: 0.85rem;
+    transition: background 0.2s;
+}
+
+.activity-item:hover {
+    background: var(--bg-hover);
+}
+
+.activity-item.activity-new {
+    animation: activityFadeIn 0.3s ease;
+}
+
+@keyframes activityFadeIn {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.activity-time {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    white-space: nowrap;
+    min-width: 60px;
+}
+
+.activity-msg {
+    flex: 1;
+    color: var(--text-primary);
+}
+
+.activity-badge {
+    font-size: 0.7rem;
+    padding: 2px 6px;
+    border-radius: 10px;
+    background: var(--bg-tertiary);
+    color: var(--text-muted);
+    text-transform: uppercase;
+}
+
+.activity-empty {
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-muted);
+}
+
+/* ==================== DIRECTOR MODE ==================== */
+
+.director-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-top: 12px;
+}
+
+.director-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 20px 12px;
+    background: var(--bg-secondary);
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 0.9rem;
+}
+
+.director-btn:hover {
+    border-color: var(--primary);
+    background: var(--bg-hover);
+    transform: translateY(-2px);
+}
+
+.director-btn:active {
+    transform: translateY(0);
+}
+
+.director-icon {
+    font-size: 2rem;
+}

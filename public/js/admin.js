@@ -187,6 +187,11 @@ function setupSocketEvents() {
             timer.sync(data.gameState.timeRemaining);
         }
 
+        // Activity feed
+        if (data.recentEvents) {
+            initActivityFeed(data.recentEvents);
+        }
+
         // Connection status
         document.getElementById('connectionDot').classList.add('status-online');
         document.getElementById('connectionText').textContent = 'Bağlı';
@@ -275,6 +280,157 @@ function setupSocketEvents() {
         // Verileri tekrar yükle (sorular vs.)
         socketManager.emit('ADMIN_REFRESH_CONTESTANTS');
     });
+
+    // Activity feed events
+    socketManager.on('ACTIVITY_EVENT', (event) => {
+        addActivityItem(event);
+    });
+}
+
+// ==================== ACTIVITY FEED ====================
+
+const EVENT_LABELS = {
+    'PLAYER_CONNECTED': '{name} baglandi',
+    'PLAYER_DISCONNECTED': '{name} ayrildi',
+    'ANSWER_SUBMITTED': '{name} cevap gonderdi',
+    'QUESTION_STARTED': 'Soru basladi',
+    'JURY_GRADED': 'Juri degerlendirme yapti',
+    'JURY_DISCONNECTED': 'Juri ayrildi',
+    'GAME_RESET': 'Oyun sifirlandi',
+    'ADMIN_LOGIN': '{name} giris yapti',
+    'ACCESS_CODE_LOGIN': '{name} giris yapti',
+    'QUESTION_ADDED': 'Soru eklendi',
+    'QUESTION_UPDATED': 'Soru guncellendi',
+    'QUESTION_DELETED': 'Soru silindi',
+};
+
+const EVENT_COLORS = {
+    'PLAYER_CONNECTED': '#10b981',
+    'PLAYER_DISCONNECTED': '#ef4444',
+    'ANSWER_SUBMITTED': '#3b82f6',
+    'QUESTION_STARTED': '#f59e0b',
+    'JURY_GRADED': '#8b5cf6',
+    'JURY_DISCONNECTED': '#ef4444',
+    'GAME_RESET': '#ef4444',
+    'ADMIN_LOGIN': '#10b981',
+    'ACCESS_CODE_LOGIN': '#10b981',
+};
+
+function formatEventMessage(event) {
+    const template = EVENT_LABELS[event.event_type] || event.event_type;
+    const name = event.actor_name || event.actor_type || '?';
+    return template.replace('{name}', name);
+}
+
+function formatEventTime(dateStr) {
+    const d = new Date(dateStr);
+    return d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+
+function createActivityElement(event) {
+    const div = document.createElement('div');
+    div.className = 'activity-item';
+    const color = EVENT_COLORS[event.event_type] || '#6b7280';
+    div.style.borderLeftColor = color;
+
+    const time = document.createElement('span');
+    time.className = 'activity-time';
+    time.textContent = formatEventTime(event.created_at);
+
+    const msg = document.createElement('span');
+    msg.className = 'activity-msg';
+    msg.textContent = formatEventMessage(event);
+
+    const badge = document.createElement('span');
+    badge.className = 'activity-badge';
+    badge.textContent = event.actor_type;
+
+    div.append(time, msg, badge);
+    return div;
+}
+
+function addActivityItem(event) {
+    // Main activity feed
+    const feed = document.getElementById('activityFeed');
+    if (feed) {
+        const empty = feed.querySelector('.activity-empty');
+        if (empty) empty.remove();
+
+        const el = createActivityElement(event);
+        el.classList.add('activity-new');
+        feed.prepend(el);
+
+        // Keep max 200 items
+        while (feed.children.length > 200) {
+            feed.lastChild.remove();
+        }
+    }
+
+    // Dashboard mini feed
+    const miniFeed = document.getElementById('dashboardActivityFeed');
+    if (miniFeed) {
+        const el = createActivityElement(event);
+        el.classList.add('activity-new');
+        miniFeed.prepend(el);
+
+        while (miniFeed.children.length > 8) {
+            miniFeed.lastChild.remove();
+        }
+    }
+}
+
+function initActivityFeed(events) {
+    const feed = document.getElementById('activityFeed');
+    const miniFeed = document.getElementById('dashboardActivityFeed');
+
+    if (feed) feed.innerHTML = '';
+    if (miniFeed) miniFeed.innerHTML = '';
+
+    // Events come sorted DESC (newest first), render in order
+    events.forEach(event => {
+        if (feed) feed.appendChild(createActivityElement(event));
+    });
+
+    // Mini feed: only last 8
+    events.slice(0, 8).forEach(event => {
+        if (miniFeed) miniFeed.appendChild(createActivityElement(event));
+    });
+
+    if (feed && events.length === 0) {
+        feed.innerHTML = '<div class="activity-empty">Henuz aktivite yok</div>';
+    }
+}
+
+// ==================== DIRECTOR MODE ====================
+
+function directorScene(scene) {
+    switch (scene) {
+        case 'idle':
+            socketManager.emit('DIRECTOR_GO_IDLE');
+            break;
+        case 'leaderboard':
+            socketManager.emit('DIRECTOR_SHOW_LEADERBOARD');
+            break;
+        case 'podium':
+            socketManager.emit('ADMIN_SHOW_PODIUM');
+            break;
+    }
+}
+
+function sendCustomText() {
+    const text = document.getElementById('directorText').value.trim();
+    const subtitle = document.getElementById('directorSubtitle').value.trim();
+    if (!text) { showToast('Metin gerekli', 'error'); return; }
+    socketManager.emit('DIRECTOR_SHOW_TEXT', { text, subtitle });
+    showToast('Ekrana gonderildi', 'success');
+}
+
+function sendFullscreenImage() {
+    const url = document.getElementById('directorImageUrl').value.trim();
+    const title = document.getElementById('directorImageTitle').value.trim();
+    if (!url) { showToast('URL gerekli', 'error'); return; }
+    socketManager.emit('DIRECTOR_SHOW_IMAGE', { media_url: url, title });
+    showToast('Ekrana gonderildi', 'success');
 }
 
 // ==================== UI UPDATES ====================

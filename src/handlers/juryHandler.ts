@@ -124,7 +124,13 @@ export async function registerJuryHandlers(io: Server, socket: Socket, gameState
         }
     });
 
-    socket.on('disconnect', () => {
+    socket.on('disconnect', async () => {
+        const event = await db.logAndReturnEvent({
+            eventType: 'JURY_DISCONNECTED',
+            actorType: 'jury',
+            competitionId: gameState.competitionId,
+        });
+        if (event) io.to('admin').emit('ACTIVITY_EVENT', event);
         log.info({ socketId: socket.id }, 'Jury ayrildi');
     });
 }

@@ -33,6 +33,28 @@ export class EventLogRepository {
         }
     }
 
+    async logAndReturn(entry: EventLogEntry): Promise<any | null> {
+        try {
+            const result = await this.pool.query(`
+                INSERT INTO event_log (event_type, actor_type, actor_id, actor_name, competition_id, question_id, payload)
+                VALUES ($1, $2, $3, $4, $5, $6, $7)
+                RETURNING *
+            `, [
+                entry.eventType,
+                entry.actorType,
+                entry.actorId ?? null,
+                entry.actorName ?? null,
+                entry.competitionId ?? null,
+                entry.questionId ?? null,
+                JSON.stringify(entry.payload ?? {}),
+            ]);
+            return result.rows[0];
+        } catch (err) {
+            log.warn({ err, eventType: entry.eventType }, 'Event log write failed');
+            return null;
+        }
+    }
+
     async getByCompetition(competitionId: number, limit = 100, offset = 0): Promise<unknown[]> {
         const result = await this.pool.query(`
             SELECT * FROM event_log

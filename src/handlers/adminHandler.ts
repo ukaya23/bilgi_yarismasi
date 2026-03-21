@@ -6,7 +6,7 @@ import type { Server, Socket } from 'socket.io';
 import db from '../../database/postgres';
 import log from '../utils/logger';
 import type { GameState } from '../state/gameState';
-import { AdminStartQuestionSchema, AdminDeleteQuestionSchema, AdminAddQuestionSchema, AdminUpdateQuestionSchema } from '../schemas/socketSchemas';
+import { AdminStartQuestionSchema, AdminDeleteQuestionSchema, AdminAddQuestionSchema, AdminUpdateQuestionSchema, DirectorShowImageSchema, DirectorShowTextSchema } from '../schemas/socketSchemas';
 import { validatePayload } from '../schemas/validateEvent';
 
 export async function registerAdminHandlers(io: Server, socket: Socket, gameState: GameState): Promise<void> {
@@ -20,7 +20,8 @@ export async function registerAdminHandlers(io: Server, socket: Socket, gameStat
         contestants: await db.getAllContestants(competitionId),
         gameState: gameState.getState(),
         leaderboard: await db.getLeaderboard(competitionId),
-        askedQuestionIds: await db.getAskedQuestionIds(competitionId)
+        askedQuestionIds: await db.getAskedQuestionIds(competitionId),
+        recentEvents: await db.getRecentEvents(50)
     });
 
     socket.on('ADMIN_START_QUESTION', async (data: unknown) => {
@@ -132,6 +133,53 @@ export async function registerAdminHandlers(io: Server, socket: Socket, gameStat
         if (gameState.state === 'REVEAL') {
             gameState.nextRevealStep();
         }
+    });
+
+    // ==================== DIRECTOR MODE ====================
+
+    socket.on('DIRECTOR_SHOW_LEADERBOARD', async () => {
+        try {
+            const leaderboard = await db.getLeaderboard(competitionId);
+            io.to(`comp-${competitionId}`).emit('DIRECTOR_SCENE', { scene: 'leaderboard', leaderboard });
+            socket.emit('ACTION_RESULT', { success: true, action: 'DIRECTOR_SHOW_LEADERBOARD' });
+        } catch (error: any) {
+            socket.emit('ACTION_RESULT', { success: false, error: error.message });
+        }
+    });
+
+    socket.on('DIRECTOR_SHOW_IMAGE', async (data: unknown) => {
+        try {
+            const validated = validatePayload(DirectorShowImageSchema, data, socket, 'DIRECTOR_SHOW_IMAGE');
+            if (!validated) return;
+            io.to(`comp-${competitionId}`).emit('DIRECTOR_SCENE', {
+                scene: 'fullscreen_image',
+                media_url: validated.media_url,
+                title: validated.title || ''
+            });
+            socket.emit('ACTION_RESULT', { success: true, action: 'DIRECTOR_SHOW_IMAGE' });
+        } catch (error: any) {
+            socket.emit('ACTION_RESULT', { success: false, error: error.message });
+        }
+    });
+
+    socket.on('DIRECTOR_SHOW_TEXT', async (data: unknown) => {
+        try {
+            const validated = validatePayload(DirectorShowTextSchema, data, socket, 'DIRECTOR_SHOW_TEXT');
+            if (!validated) return;
+            io.to(`comp-${competitionId}`).emit('DIRECTOR_SCENE', {
+                scene: 'custom_text',
+                text: validated.text,
+                subtitle: validated.subtitle || ''
+            });
+            socket.emit('ACTION_RESULT', { success: true, action: 'DIRECTOR_SHOW_TEXT' });
+        } catch (error: any) {
+            socket.emit('ACTION_RESULT', { success: false, error: error.message });
+        }
+    });
+
+    socket.on('DIRECTOR_GO_IDLE', () => {
+        io.to(`comp-${competitionId}`).emit('DIRECTOR_SCENE', { scene: 'idle' });
+        socket.emit('ACTION_RESULT', { success: true, action: 'DIRECTOR_GO_IDLE' });
     });
 
     socket.on('disconnect', () => {
