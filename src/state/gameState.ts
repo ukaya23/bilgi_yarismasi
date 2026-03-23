@@ -48,6 +48,7 @@ export class GameState {
     gameTimer: GameTimer;
     revealManager: RevealManager;
     lastResults: any | null;
+    private _locking: boolean;
 
     constructor(competitionId: number = 1) {
         this.competitionId = competitionId;
@@ -59,6 +60,7 @@ export class GameState {
         this.io = null;
         this.lastResults = null;
 
+        this._locking = false;
         this.gameTimer = new GameTimer();
         this.revealManager = new RevealManager();
     }
@@ -132,6 +134,12 @@ export class GameState {
         this.questionStartTime = Date.now();
         this.answeredPlayers.clear();
 
+        // DB'den bu soruya daha önce cevap verilmişse (sunucu restart sonrası) yükle
+        const existingAnswers = await db.getAnswersForQuestion(question.id, this.competitionId);
+        for (const ans of existingAnswers) {
+            this.answeredPlayers.add(ans.contestant_id);
+        }
+
         await this.setState('QUESTION_ACTIVE');
 
         this.broadcast('NEW_QUESTION', {
@@ -195,6 +203,10 @@ export class GameState {
     }
 
     async lockQuestion(): Promise<void> {
+        if (this._locking || this.state === 'LOCKED') return;
+        this._locking = true;
+
+        try {
         this.gameTimer.clear();
 
         await this.setState('LOCKED');
@@ -214,6 +226,9 @@ export class GameState {
             setTimeout(async () => {
                 await this.showResults();
             }, 500);
+        }
+        } finally {
+            this._locking = false;
         }
     }
 
@@ -250,11 +265,18 @@ export class GameState {
             return { success: false, message: 'Zaten cevap verildi' };
         }
 
+        // Sunucu tarafı timeRemaining doğrulaması — istemci değerine güvenme
+        const serverTimeRemaining = this.gameTimer.timeRemaining;
+        const validatedTimeRemaining = Math.max(0, Math.min(
+            serverTimeRemaining + 2,  // 2 saniyelik ağ toleransı
+            timeRemaining ?? serverTimeRemaining
+        ));
+
         const result = await db.saveAnswer(
             this.currentQuestion.id,
             contestantId,
             answerText,
-            timeRemaining || this.gameTimer.timeRemaining
+            validatedTimeRemaining
         );
 
         if (result.success) {
@@ -266,7 +288,7 @@ export class GameState {
                 actorId: contestantId,
                 competitionId: this.competitionId,
                 questionId: this.currentQuestion.id,
-                payload: { timeRemaining: timeRemaining || this.gameTimer.timeRemaining }
+                payload: { timeRemaining: validatedTimeRemaining }
             });
 
             if (this.io) {
@@ -281,8 +303,22 @@ export class GameState {
     }
 
     async applyJuryGrades(grades: JuryGrade[]): Promise<void> {
-        for (const grade of grades) {
-            await db.gradeAnswer(grade.answerId, grade.isCorrect, grade.points);
+        const correctGrades = grades.filter(g => g.isCorrect);
+        const incorrectGrades = grades.filter(g => !g.isCorrect);
+
+        if (correctGrades.length > 0) {
+            await db.gradeAnswersBulk(
+                correctGrades.map(g => g.answerId),
+                true,
+                correctGrades[0].points
+            );
+        }
+        if (incorrectGrades.length > 0) {
+            await db.gradeAnswersBulk(
+                incorrectGrades.map(g => g.answerId),
+                false,
+                0
+            );
         }
 
         this.logActivity({
@@ -290,7 +326,7 @@ export class GameState {
             actorType: 'jury',
             competitionId: this.competitionId,
             questionId: this.currentQuestion?.id,
-            payload: { gradesCount: grades.length, correctCount: grades.filter(g => g.isCorrect).length }
+            payload: { gradesCount: grades.length, correctCount: correctGrades.length }
         });
     }
 

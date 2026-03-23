@@ -19,6 +19,7 @@ import { registerJuryHandlers } from './src/handlers/juryHandler';
 import { registerScreenHandlers } from './src/handlers/screenHandler';
 
 import type { AuthenticatedSocket } from './src/types';
+import { applySocketRateLimit } from './src/middleware/socketRateLimit';
 
 const app = express();
 const httpServer = createServer(app);
@@ -88,6 +89,7 @@ import { optionalSocketAuth } from './src/auth/socketAuth';
 io.use(optionalSocketAuth as any);
 
 io.on('connection', async (socket: AuthenticatedSocket) => {
+    applySocketRateLimit(socket);
     log.info({ socketId: socket.id, role: socket.role || 'unauthenticated' }, 'Yeni socket baglantisi');
 
     if (socket.role) {
